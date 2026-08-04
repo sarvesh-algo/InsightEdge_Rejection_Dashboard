@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import math
 import pandas as pd
-from datetime import timedelta
+from datetime import timedelta, date
 
 DATA_PATH = Path(__file__).resolve().parents[1] / "files" / "combined_output(1).csv"
 
@@ -98,9 +98,23 @@ def filter_data(
 
 
 def period_for_agenda(df: pd.DataFrame, agenda: str) -> tuple[pd.Timestamp, pd.Timestamp]:
-    """Automatic newsletter periods based on the latest month present in the filtered dataset."""
-    latest = df["month_start"].max()
+    """Automatic newsletter periods based on the latest *recent* month in the dataset.
+
+    Uses the latest month whose end is not in the future relative to today, so
+    stray future-dated rows in the source file don't push the window into empty
+    territory.
+    """
+    today = pd.Timestamp.today().normalize()
+    latest_in_data = df["month_start"].max()
     earliest = df["month_start"].min()
+    # If the dataset's latest month is in the future, fall back to the most
+    # recent month that has actually ended.
+    if pd.notna(latest_in_data) and latest_in_data > today:
+        recent_months = df.loc[df["month_start"] <= today, "month_start"]
+        latest = recent_months.max() if not recent_months.empty else latest_in_data
+    else:
+        latest = latest_in_data
+
     if agenda == "Agenda 2 · Last 6 Months (Excl. Current)":
         end = latest - pd.offsets.MonthBegin(1)
         start = end - pd.DateOffset(months=5)

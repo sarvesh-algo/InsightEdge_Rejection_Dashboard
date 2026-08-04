@@ -205,6 +205,16 @@ def detail_table(df: pd.DataFrame):
 def main():
     df = get_dataset()
 
+    # Fix column name case sensitivity
+    try:
+        start_date = df['Date'].min()
+        end_date = df['Date'].max()
+    except KeyError:
+        # Handle case where column name might be different
+        df.rename(columns={'date': 'Date'}, inplace=True)
+        start_date = df['Date'].min()
+        end_date = df['Date'].max()
+
     # Sidebar with optional date range override
     with st.sidebar:
         st.markdown('<div class="brand"><div class="brand-mark">◇</div><div><div class="brand-title">InsightEdge</div><div class="brand-sub">Quality Intelligence</div></div></div>', unsafe_allow_html=True)
