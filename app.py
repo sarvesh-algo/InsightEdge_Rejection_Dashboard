@@ -46,13 +46,6 @@ hr { border-color:#173a5d !important; }
 """
 st.markdown(CSS, unsafe_allow_html=True)
 
-AGENDAS = [
-    "Agenda 1 · Summary Until Generation Date",
-    "Agenda 2 · Last 6 Months (Excl. Current)",
-    "Agenda 3 · Current Month",
-    "Agenda 4 · Last 6 Months (Incl. Current)",
-]
-
 @st.cache_data(show_spinner=False)
 def get_dataset() -> pd.DataFrame:
     return load_data()
@@ -96,104 +89,69 @@ def previous_equal_period(df: pd.DataFrame, start: pd.Timestamp, end: pd.Timesta
     return filter_data(df, prev_start, prev_end)
 
 
-def common_charts(period_df: pd.DataFrame, compact_top=5):
+def render_overview(df: pd.DataFrame):
     c1, c2 = st.columns([1.2, 1])
     with c1:
-        mt = monthly_totals(period_df)
+        mt = monthly_totals(df)
         chart(line_chart(mt, "month_start", "rejection_quantity", title="Monthly Rejection Trend"))
     with c2:
-        chart(pareto_chart(period_df, "defect", top_n=compact_top, title="Top Defects (Pareto)"))
-
+        chart(pareto_chart(df, "defect", top_n=5, title="Top Defects (Pareto)"))
     c1, c2, c3 = st.columns(3)
     with c1:
-        chart(horizontal_bar(top_n(period_df, "process", n=compact_top).rename(columns={"process":"Process"}), "Process", title="Rejections by Process"))
+        chart(horizontal_bar(top_n(df, "process", n=5).rename(columns={"process":"Process"}), "Process", title="Rejections by Process"))
     with c2:
-        chart(horizontal_bar(top_n(period_df, "machine", n=compact_top).rename(columns={"machine":"Machine"}), "Machine", title="Rejections by Machine"))
+        chart(horizontal_bar(top_n(df, "machine", n=5).rename(columns={"machine":"Machine"}), "Machine", title="Rejections by Machine"))
     with c3:
-        chart(location_bar(period_df, title="Rejections by Location"))
+        chart(location_bar(df, title="Rejections by Location"))
 
-
-def agenda_1(df: pd.DataFrame):
-    common_charts(df, 6)
-    c1, c2, c3 = st.columns(3)
+def render_part_analysis(df: pd.DataFrame):
+    st.subheader("Part Analysis")
+    c1, c2 = st.columns(2)
     with c1:
-        chart(horizontal_bar(top_n(df, "part_name_clean", n=5).rename(columns={"part_name_clean":"Part"}), "Part", title="Top Defective Parts"))
+        chart(horizontal_bar(top_n(df, "part_name_clean", n=10).rename(columns={"part_name_clean":"Part"}), "Part", title="Top 10 Defective Parts"))
     with c2:
-        x = top_n_by_group(df, "location", "process", n=3).rename(columns={"location":"Location", "process":"Process"})
-        chart(grouped_bar(x, "Process", "Location", title="Top Processes by Location"))
-    with c3:
-        x = top_n_by_group(df, "location", "part_name_clean", n=3).rename(columns={"location":"Location", "part_name_clean":"Part"})
-        chart(grouped_bar(x, "Part", "Location", title="Top Parts by Location"))
+        chart(ppm_bar(ppm_top_parts(df, 10), title="Top 10 Parts by PPM"))
+    chart(multi_top_trend(df, "part_name_clean", "Top Defective Parts · 6M Trend", max_series=5))
 
-    c1, c2, c3 = st.columns(3)
+def render_defect_analysis(df: pd.DataFrame):
+    st.subheader("Defect Analysis")
+    c1, c2 = st.columns(2)
     with c1:
+        chart(pareto_chart(df, "defect", top_n=10, title="Pareto · Defect Types"))
+    with c2:
+        chart(horizontal_bar(top_n(df, "defect", n=10).rename(columns={"defect":"Defect"}), "Defect", title="Most Impactful Root Causes"))
+
+def render_process_analysis(df: pd.DataFrame):
+    st.subheader("Process Analysis")
+    chart(horizontal_bar(top_n(df, "process", n=15).rename(columns={"process":"Process"}), "Process", title="Rejections by Process"))
+    x = top_n_by_group(df, "location", "process", n=5).rename(columns={"location":"Location", "process":"Process"})
+    chart(grouped_bar(x, "Process", "Location", title="Top Processes by Location"))
+
+def render_machine_analysis(df: pd.DataFrame):
+    st.subheader("Machine Analysis")
+    chart(horizontal_bar(top_n(df, "machine", n=15).rename(columns={"machine":"Machine"}), "Machine", title="Rejections by Machine"))
+
+def render_location_analysis(df: pd.DataFrame):
+    st.subheader("Location Analysis")
+    c1, c2 = st.columns(2)
+    with c1:
+        chart(location_bar(df, title="Rejections by Location"))
+    with c2:
         ms = monthly_summary(df)
         chart(line_chart(ms, "month_start", "rejection_quantity", "location", "Location-wise Trend"))
-    with c2:
-        chart(pareto_chart(df, "part_no_clean", "total_cost", 15, "Pareto · Rejection Cost"))
-    with c3:
-        chart(ppm_lines(monthly_ppm_top_part_lines(df, max_parts=6), "PPM Trends · Monthly Peak Parts"))
 
+def render_cost_analysis(df: pd.DataFrame):
+    st.subheader("Cost Analysis")
+    chart(pareto_chart(df, "part_no_clean", "total_cost", 15, "Pareto · Rejection Cost"))
 
-def agenda_2(df: pd.DataFrame):
-    c1, c2, c3 = st.columns(3)
-    with c1: chart(location_bar(df, title="6M Location Summary"))
-    with c2:
-        ms = monthly_summary(df); chart(line_chart(ms, "month_start", "rejection_quantity", "location", "6M Rejection Trend"))
-    with c3: chart(segmented_monthly_share(df, title="Monthly Contribution to Rejections"))
-
-    c1, c2, c3 = st.columns(3)
-    with c1: chart(control_chart(monthly_totals(df), "month_start", "rejection_quantity", "Control Chart · Total Rejections"))
-    with c2: chart(horizontal_bar(top_n(df, "part_name_clean", n=5).rename(columns={"part_name_clean":"Part"}), "Part", title="Top Defective Parts"))
-    with c3:
-        x = top_n_by_group(df, "location", "process", n=3).rename(columns={"location":"Location", "process":"Process"})
-        chart(grouped_bar(x, "Process", "Location", title="Critical Processes · Location-wise"))
-
-    c1, c2, c3 = st.columns(3)
-    with c1: chart(horizontal_bar(top_n(df, "defect", n=5).rename(columns={"defect":"Defect"}), "Defect", title="Most Impactful Root Causes"))
-    with c2: chart(pareto_chart(df, "defect", top_n=10, title="Pareto · Defect Types"))
-    with c3: chart(ppm_bar(ppm_top_parts(df, 5), title="Top 5 Parts by PPM"))
-
-
-def agenda_3(df: pd.DataFrame):
-    c1, c2, c3 = st.columns(3)
-    with c1: chart(location_bar(df, title="Current Month · Location Summary"))
-    with c2: chart(horizontal_bar(top_n(df, "part_name_clean", n=5).rename(columns={"part_name_clean":"Part"}), "Part", title="Top Defective Parts"))
-    with c3:
-        x = top_n_by_group(df, "location", "part_no_clean", n=5).rename(columns={"location":"Location", "part_no_clean":"Part No."})
-        chart(grouped_bar(x, "Part No.", "Location", title="Top Parts · Location-wise"))
-
-    c1, c2, c3 = st.columns(3)
-    with c1: chart(horizontal_bar(top_n(df, "process", n=5).rename(columns={"process":"Process"}), "Process", title="Top Critical Processes"))
-    with c2:
-        x = top_n_by_group(df, "location", "process", n=5).rename(columns={"location":"Location", "process":"Process"})
-        chart(grouped_bar(x, "Process", "Location", title="Processes · Location-wise"))
-    with c3: chart(horizontal_bar(top_n(df, "defect", n=5).rename(columns={"defect":"Defect"}), "Defect", title="Most Impactful Root Causes"))
-
-    c1, c2, c3 = st.columns(3)
+def render_root_cause_analysis(df: pd.DataFrame):
+    st.subheader("Root Cause Analysis")
+    c1, c2 = st.columns(2)
     with c1:
         x = top_n_by_group(df, "location", "defect", n=5).rename(columns={"location":"Location", "defect":"Defect"})
         chart(grouped_bar(x, "Defect", "Location", title="Root Causes · Location-wise"))
-    with c2: chart(pareto_chart(df, "defect", top_n=10, title="Pareto · Defect Types"))
-    with c3: chart(ppm_bar(ppm_top_parts(df, 5), title="Top 5 Parts by PPM"))
-
-
-def agenda_4(df: pd.DataFrame):
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        ms = monthly_summary(df); chart(line_chart(ms, "month_start", "rejection_quantity", "location", "6M Trend · Including Current"))
-    with c2: chart(segmented_monthly_share(df, title="Monthly Location Share"))
-    with c3: chart(control_chart(monthly_totals(df), "month_start", "rejection_quantity", "6M Control Chart"))
-
-    c1, c2, c3 = st.columns(3)
-    with c1: chart(multi_top_trend(df, "part_name_clean", "Top Defective Parts · 6M Trend", max_series=5))
-    with c2: chart(multi_top_trend(df, "process", "Top Critical Processes · 6M Trend", max_series=5))
-    with c3: chart(multi_top_trend(df, "defect", "Top Root Causes · 6M Trend", max_series=5))
-
-    c1, c2, c3 = st.columns(3)
-    with c1: chart(pareto_chart(df, "part_no_clean", "total_cost", 15, "Pareto · Rejection Cost"))
-    with c2: chart(pareto_chart(df, "defect", top_n=10, title="Pareto · Defect Types"))
-    with c3: chart(ppm_lines(monthly_ppm_top_part_lines(df, max_parts=6), "PPM Trend · Peak Parts"))
+    with c2:
+        chart(pareto_chart(df, "defect", top_n=10, title="Pareto · Defect Types"))
 
 
 def detail_table(df: pd.DataFrame):
@@ -205,32 +163,27 @@ def detail_table(df: pd.DataFrame):
 def main():
     df = get_dataset()
 
-    # Fix column name case sensitivity
-    try:
-        start_date = df['Date'].min()
-        end_date = df['Date'].max()
-    except KeyError:
-        # Handle case where column name might be different
-        df.rename(columns={'date': 'Date'}, inplace=True)
-        start_date = df['Date'].min()
-        end_date = df['Date'].max()
+    if 'page' not in st.session_state:
+        st.session_state.page = 'Overview'
 
-    # Sidebar with optional date range override
+    # Sidebar
     with st.sidebar:
         st.markdown('<div class="brand"><div class="brand-mark">◇</div><div><div class="brand-title">InsightEdge</div><div class="brand-sub">Quality Intelligence</div></div></div>', unsafe_allow_html=True)
-        st.markdown("#### Agenda Navigation")
-        agenda = st.radio("Select Agenda", AGENDAS, label_visibility="collapsed")
+        st.markdown("#### Navigation")
         
-        # Optional date range selection
+        PAGES = ["Overview", "Part Analysis", "Defect Analysis", "Process Analysis", "Machine Analysis", "Location Analysis", "Cost Analysis", "Root Cause Analysis"]
+        for page in PAGES:
+            if st.button(page):
+                st.session_state.page = page
+        
         st.markdown("---")
         st.markdown("#### Date Range")
-        show_custom_dates = st.checkbox("Custom Date Range", False)
-        if show_custom_dates:
-            col1, col2 = st.columns(2)
-            custom_start = col1.date_input("Start Date")
-            custom_end = col2.date_input("End Date")
-        else:
-            custom_start, custom_end = None, None
+        
+        start_date_default, end_date_default = period_for_agenda(df, "Agenda 1 · Summary Until Generation Date")
+        
+        col1, col2 = st.columns(2)
+        start_date = col1.date_input("Start Date", start_date_default)
+        end_date = col2.date_input("End Date", end_date_default)
             
         st.markdown("---")
         st.markdown("#### Filters")
@@ -242,47 +195,33 @@ def main():
         st.markdown("---")
         st.markdown(f'<div class="small-muted">Dataset<br><b>{df["Date"].min():%d %b %Y} – {df["Date"].max():%d %b %Y}</b><br><br>Total Records<br><b>{len(df):,}</b></div>', unsafe_allow_html=True)
 
-    base_filtered = filter_data(df, locations=locations or None, processes=processes or None, machines=machines or None, defects=defects or None, parts=parts or None)
-    if base_filtered.empty:
+    period_df = filter_data(df, start_date, end_date, locations=locations or None, processes=processes or None, machines=machines or None, defects=defects or None, parts=parts or None)
+    
+    if period_df.empty:
         st.warning("No rows match the current filters.")
         st.stop()
 
-    # Get default dates from agenda
-    start_date, end_date = period_for_agenda(base_filtered, agenda)
-    if show_custom_dates and custom_start and custom_end:
-        start_date = custom_start
-        end_date = custom_end
-    period_df = filter_data(base_filtered, start_date, end_date)
-
-    st.markdown(f'<div class="page-head"><div><div class="page-title">{agenda.split(" · ",1)[1]}</div><div class="page-sub">Real-time overview of customer complaint quality performance</div></div><div class="page-sub">InsightEdge Executive Dashboard</div></div>', unsafe_allow_html=True)
-
-    f1, f2, f3 = st.columns([1.1, 1.1, 3.8])
-    with f1:
-        start_date_input = st.date_input(
-            "Date From", 
-            value=max(start_date, df['Date'].min().date()) if show_custom_dates else start_date
-        )
-
-    with f2:
-        end_date_input = st.date_input(
-            "Date To", 
-            value=min(end_date, df['Date'].max().date()) if show_custom_dates else end_date,
-            min_value=df['Date'].min().date()
-        )
-    with f3:
-        st.markdown(f'<div class="small-muted" style="padding-top:27px">Showing <b>{start_date_input:%d %b %Y}</b> to <b>{end_date_input:%d %b %Y}</b> · all charts update from the same filters</div>', unsafe_allow_html=True)
-
-    baseline = previous_equal_period(base_filtered, pd.Timestamp(start_date_input), pd.Timestamp(end_date_input))
+    st.markdown(f'<div class="page-head"><div><div class="page-title">{st.session_state.page}</div><div class="page-sub">Real-time overview of customer complaint quality performance</div></div><div class="page-sub">InsightEdge Executive Dashboard</div></div>', unsafe_allow_html=True)
+    
+    baseline = previous_equal_period(df, pd.Timestamp(start_date), pd.Timestamp(end_date))
     kpi_strip(period_df, baseline)
 
-    if agenda.startswith("Agenda 1"):
-        agenda_1(period_df)
-    elif agenda.startswith("Agenda 2"):
-        agenda_2(period_df)
-    elif agenda.startswith("Agenda 3"):
-        agenda_3(period_df)
-    else:
-        agenda_4(period_df)
+    if st.session_state.page == "Overview":
+        render_overview(period_df)
+    elif st.session_state.page == "Part Analysis":
+        render_part_analysis(period_df)
+    elif st.session_state.page == "Defect Analysis":
+        render_defect_analysis(period_df)
+    elif st.session_state.page == "Process Analysis":
+        render_process_analysis(period_df)
+    elif st.session_state.page == "Machine Analysis":
+        render_machine_analysis(period_df)
+    elif st.session_state.page == "Location Analysis":
+        render_location_analysis(period_df)
+    elif st.session_state.page == "Cost Analysis":
+        render_cost_analysis(period_df)
+    elif st.session_state.page == "Root Cause Analysis":
+        render_root_cause_analysis(period_df)
 
     with st.expander("View filtered complaint records"):
         detail_table(period_df)
