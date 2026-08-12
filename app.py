@@ -42,6 +42,24 @@ h1,h2,h3 { color:#f4f8fc !important; letter-spacing:-.02em; }
 hr { border-color:#173a5d !important; }
 .stButton>button { background:#0d2b4c;border:1px solid #1e568a;color:#b9d8f7;border-radius:7px; }
 .stSelectbox label,.stMultiSelect label,.stDateInput label { color:#9db4cc !important;font-size:10px !important; }
+[data-testid="stSidebar"] [data-testid="stRadio"] label {
+    padding: 6px 10px;
+    border-radius: 6px;
+    margin-bottom: 4px;
+    transition: background-color 0.2s ease-in-out;
+    background-color: transparent;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:has(input:checked) {
+    background-color: #1a385a;
+    font-weight: 600;
+    color: #e8f1fb !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] label:hover {
+    background-color: #102a47;
+}
+[data-testid="stSidebar"] [data-testid="stRadio"] input[type="radio"] {
+    display: none;
+}
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -158,29 +176,24 @@ def detail_table(df: pd.DataFrame):
     cols = ["Date", "location", "process", "machine", "part_no_clean", "part_name_clean", "defect", "rejection quantity", "production quantity", "total_cost", "safe_ppm"]
     cols = [c for c in cols if c in df.columns]
     st.dataframe(df[cols].sort_values("Date", ascending=False), use_container_width=True, height=280, hide_index=True)
-
-
 def main():
     df = get_dataset()
-
-    if 'page' not in st.session_state:
-        st.session_state.page = 'Overview'
 
     # Sidebar
     with st.sidebar:
         st.markdown('<div class="brand"><div class="brand-mark">◇</div><div><div class="brand-title">InsightEdge</div><div class="brand-sub">Quality Intelligence</div></div></div>', unsafe_allow_html=True)
         st.markdown("#### Navigation")
-        
+
         PAGES = ["Overview", "Part Analysis", "Defect Analysis", "Process Analysis", "Machine Analysis", "Location Analysis", "Cost Analysis", "Root Cause Analysis"]
-        for page in PAGES:
-            if st.button(page):
-                st.session_state.page = page
-        
+
+        # Use st.radio for navigation and update session_state
+        page = st.radio("Navigation", PAGES, label_visibility="collapsed", key="page_selection")
+        st.session_state.page = page
+
         st.markdown("---")
         st.markdown("#### Date Range")
-        
+
         start_date_default, end_date_default = period_for_agenda(df, "Agenda 1 · Summary Until Generation Date")
-        
         col1, col2 = st.columns(2)
         start_date = col1.date_input("Start Date", start_date_default)
         end_date = col2.date_input("End Date", end_date_default)
