@@ -162,14 +162,14 @@ def render_cost_analysis(df: pd.DataFrame):
     st.subheader("Cost Analysis")
     chart(pareto_chart(df, "part_no_clean", "total_cost", 15, "Pareto · Rejection Cost"))
 
-def render_root_cause_analysis(df: pd.DataFrame):
-    st.subheader("Root Cause Analysis")
-    c1, c2 = st.columns(2)
-    with c1:
-        x = top_n_by_group(df, "location", "defect", n=5).rename(columns={"location":"Location", "defect":"Defect"})
-        chart(grouped_bar(x, "Defect", "Location", title="Root Causes · Location-wise"))
-    with c2:
-        chart(pareto_chart(df, "defect", top_n=10, title="Pareto · Defect Types"))
+# def render_root_cause_analysis(df: pd.DataFrame):
+#     st.subheader("Root Cause Analysis")
+#     c1, c2 = st.columns(2)
+#     with c1:
+#         x = top_n_by_group(df, "location", "defect", n=5).rename(columns={"location":"Location", "defect":"Defect"})
+#         chart(grouped_bar(x, "Defect", "Location", title="Root Causes · Location-wise"))
+#     with c2:
+#         chart(pareto_chart(df, "defect", top_n=10, title="Pareto · Defect Types"))
 
 
 def detail_table(df: pd.DataFrame):
@@ -184,7 +184,8 @@ def main():
         st.markdown('<div class="brand"><div class="brand-mark">◇</div><div><div class="brand-title">InsightEdge</div><div class="brand-sub">Quality Intelligence</div></div></div>', unsafe_allow_html=True)
         st.markdown("#### Navigation")
 
-        PAGES = ["Overview", "Part Analysis", "Defect Analysis", "Process Analysis", "Machine Analysis", "Location Analysis", "Cost Analysis", "Root Cause Analysis"]
+        # root cause analysis removed from sidebar
+        PAGES = ["Overview", "Part Analysis", "Defect Analysis", "Process Analysis", "Machine Analysis", "Location Analysis", "Cost Analysis", ]
 
         # Use st.radio for navigation and update session_state
         page = st.radio("Navigation", PAGES, label_visibility="collapsed", key="page_selection")
@@ -233,8 +234,8 @@ def main():
         render_location_analysis(period_df)
     elif st.session_state.page == "Cost Analysis":
         render_cost_analysis(period_df)
-    elif st.session_state.page == "Root Cause Analysis":
-        render_root_cause_analysis(period_df)
+    # elif st.session_state.page == "Root Cause Analysis":
+    #     render_root_cause_analysis(period_df)
 
     with st.expander("View filtered complaint records"):
         detail_table(period_df)
