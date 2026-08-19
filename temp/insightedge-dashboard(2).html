@@ -1,0 +1,1616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>InsightEdge — Quality Intelligence Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js';"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+  :root{
+    --bg:#0A1120; --bg-alt:#0D1526; --sidebar:#0B1220; --panel:#111A2E; --panel-alt:#0F1830;
+    --border:#1D2A44; --border-light:#28395B;
+    --text:#E7ECF5; --text-dim:#8B96AC; --text-faint:#5A6786;
+    --blue:#3B82F6; --purple:#8B7CF6; --teal:#22C58B; --amber:#F5A524; --red:#EF4444; --pink:#EC4899;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;}
+  a{color:inherit;}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--border-light);border-radius:4px;}
+
+  .app{display:flex;min-height:100vh;}
+
+  /* ---------------- SIDEBAR ---------------- */
+  .sidebar{
+    width:236px;flex-shrink:0;background:var(--sidebar);border-right:1px solid var(--border);
+    display:flex;flex-direction:column;padding:18px 14px;position:sticky;top:0;height:100vh;overflow-y:auto;
+  }
+  .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 18px;}
+  .brand-icon{
+    width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--blue),var(--purple));
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .brand-icon svg{width:20px;height:20px;stroke:#fff;}
+  .brand-text h1{font-size:16px;margin:0;font-weight:700;letter-spacing:0.2px;}
+  .brand-text small{color:var(--text-dim);font-size:11px;}
+
+  .nav{display:flex;flex-direction:column;gap:2px;margin-top:4px;flex:1;}
+  .nav-item{
+    display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;
+    color:var(--text-dim);font-size:13.5px;font-weight:500;border:1px solid transparent;
+  }
+  .nav-item svg{width:16px;height:16px;stroke:currentColor;flex-shrink:0;}
+  .nav-item:hover{background:var(--panel-alt);color:var(--text);}
+  .nav-item.active{background:rgba(59,130,246,0.14);color:#fff;border-color:rgba(59,130,246,0.35);}
+  .nav-item.active svg{stroke:var(--blue);}
+
+  .data-overview{margin-top:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;}
+  .data-overview h4{margin:0 0 10px;font-size:12.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.6px;font-weight:700;}
+  .do-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-dim);margin-bottom:9px;}
+  .do-row svg{width:14px;height:14px;stroke:var(--text-faint);flex-shrink:0;}
+  .do-row b{display:block;color:var(--text);font-size:12.5px;font-weight:600;}
+  .refresh-btn{
+    width:100%;margin-top:2px;background:var(--blue);color:#fff;border:none;border-radius:8px;
+    padding:9px;font-size:13px;font-weight:600;cursor:pointer;
+  }
+  .refresh-btn:hover{background:#2f6fe0;}
+
+  /* ---------------- MAIN ---------------- */
+  .main{flex:1;padding:18px 22px 60px;min-width:0;}
+  .topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px;}
+  .topbar-title h1{margin:0;font-size:21px;font-weight:700;}
+  .topbar-title p{margin:2px 0 0;color:var(--text-dim);font-size:12.5px;}
+  .filters-bar{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;}
+  .field{display:flex;flex-direction:column;gap:3px;}
+  .field span{font-size:10.5px;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;font-weight:700;}
+  .field select{
+    background:var(--panel);border:1px solid var(--border-light);color:var(--text);border-radius:7px;
+    padding:7px 9px;font-size:12.5px;min-width:118px;cursor:pointer;font-family:'Inter';
+  }
+  .field select:focus{outline:2px solid var(--blue);}
+  .btn-reset{
+    background:var(--panel);border:1px solid var(--border-light);color:var(--text);border-radius:7px;
+    padding:8px 12px;font-size:12.5px;cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:600;
+    height:34px;align-self:flex-end;
+  }
+  .btn-reset:hover{border-color:var(--blue);}
+  .btn-reset svg{width:14px;height:14px;}
+
+  .page{display:none;}
+  .page.active{display:block;}
+
+  /* ---------------- OVERVIEW LAYOUT ---------------- */
+  .overview-grid{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start;}
+  .left-col > * + *{margin-top:14px;}
+  .right-col > * + *{margin-top:14px;}
+
+  .kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;}
+  .kpi-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;gap:10px;}
+  .kpi-icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .kpi-icon svg{width:17px;height:17px;}
+  .kpi-info{min-width:0;flex:1;}
+  .kpi-label{font-size:11px;color:var(--text-dim);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .kpi-value{font-size:19px;font-weight:800;margin-top:2px;line-height:1;}
+  .kpi-unit{font-size:12px;color:var(--text-dim);margin-left:2px;font-weight:600;}
+  .kpi-foot{display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap;}
+  .kpi-delta{font-size:11px;font-weight:700;}
+  .kpi-delta.good{color:var(--teal);}
+  .kpi-delta.bad{color:var(--red);}
+  .kpi-delta.flat{color:var(--text-faint);}
+  .kpi-sub{font-size:10.5px;color:var(--text-faint);}
+
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+  .panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 16px 0;}
+  .panel-head h2{font-size:15.5px;margin:0;font-weight:700;}
+  .panel-head .hint{font-size:11px;color:var(--text-faint);}
+  .panel-body{padding:10px 16px 16px;}
+
+  .chart-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .chart-box{position:relative;height:250px;}
+  .chart-box.small{height:190px;}
+
+  .breakdown-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+
+  .table-wrap{overflow-x:auto;}
+  table.data-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  .data-table th{
+    text-align:left;color:var(--text-dim);font-size:10.5px;text-transform:uppercase;letter-spacing:0.4px;
+    font-weight:700;padding:6px 8px;border-bottom:1px solid var(--border-light);white-space:nowrap;cursor:default;
+  }
+  .data-table th.sortable{cursor:pointer;}
+  .data-table th.sortable:hover{color:var(--text);}
+  .data-table td{padding:8px 8px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  .data-table tr:hover td{background:var(--panel-alt);}
+  .empty{color:var(--text-faint);padding:14px 4px;font-size:12.5px;}
+
+  .part-badge{font-family:'Inter';font-weight:700;font-size:11.5px;background:var(--panel-alt);border:1px solid var(--border-light);padding:2px 7px;border-radius:5px;}
+
+  /* ---------------- RIGHT COLUMN CARDS ---------------- */
+  .insight-text{font-size:12.5px;line-height:1.6;color:var(--text);margin:0 0 8px;}
+  .insight-bullets{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px;}
+  .insight-bullets li{display:flex;gap:8px;font-size:12px;color:var(--text-dim);line-height:1.5;}
+  .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:5px;}
+  .ai-live-badge{display:inline-flex;align-items:center;gap:4px;font-size:9.5px;font-weight:800;letter-spacing:0.4px;
+    color:var(--blue);background:rgba(59,130,246,0.14);border:1px solid rgba(59,130,246,0.35);border-radius:999px;padding:2px 7px;margin-bottom:8px;}
+  .link-btn{background:none;border:none;color:var(--blue);font-size:12px;font-weight:700;cursor:pointer;padding:0;}
+  .link-btn:hover{text-decoration:underline;}
+  .ai-btn{
+    display:flex;align-items:center;gap:5px;background:var(--blue);color:#fff;border:none;border-radius:7px;
+    padding:6px 10px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;
+  }
+  .ai-btn:disabled{opacity:0.6;}
+  .ai-btn svg{width:13px;height:13px;}
+  .spin{animation:spin 1s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .rec-list{display:flex;flex-direction:column;gap:9px;}
+  .rec-item{display:flex;gap:9px;align-items:flex-start;}
+  .rec-num{width:20px;height:20px;border-radius:50%;background:var(--panel-alt);border:1px solid var(--border-light);
+    display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px;}
+  .rec-text{font-size:12.5px;color:var(--text);flex:1;line-height:1.45;}
+  .priority-pill{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:0.3px;padding:2px 7px;border-radius:999px;flex-shrink:0;white-space:nowrap;}
+  .priority-pill.high{color:var(--red);background:rgba(239,68,68,0.14);}
+  .priority-pill.medium{color:var(--amber);background:rgba(245,165,36,0.14);}
+  .priority-pill.low{color:var(--teal);background:rgba(34,197,139,0.14);}
+
+  .alert-list{display:flex;flex-direction:column;gap:9px;}
+  .alert-item{display:flex;gap:8px;align-items:flex-start;font-size:12px;}
+  .sev-dot{width:8px;height:8px;border-radius:50%;margin-top:4px;flex-shrink:0;}
+  .sev-dot.critical{background:var(--red);}
+  .sev-dot.watch{background:var(--amber);}
+  .alert-text{color:var(--text-dim);flex:1;line-height:1.45;}
+  .alert-time{color:var(--text-faint);font-size:10.5px;white-space:nowrap;}
+
+  .chat-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+  .chip{background:var(--panel-alt);border:1px solid var(--border-light);color:var(--text-dim);
+    border-radius:999px;padding:6px 10px;font-size:11.5px;cursor:pointer;}
+  .chip:hover{border-color:var(--blue);color:var(--text);}
+  .chat-input-row{display:flex;gap:8px;}
+  .chat-input-row input{
+    flex:1;background:var(--panel-alt);border:1px solid var(--border-light);border-radius:8px;
+    padding:9px 10px;color:var(--text);font-size:12.5px;font-family:'Inter';
+  }
+  .chat-input-row input:focus{outline:2px solid var(--blue);}
+  .chat-send{background:var(--blue);border:none;border-radius:8px;width:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff;flex-shrink:0;}
+  .chat-send:disabled{opacity:0.5;}
+  .chat-send svg{width:15px;height:15px;}
+
+  /* ---------------- SIMPLE ANALYSIS PAGES ---------------- */
+  .page-header{margin-bottom:12px;}
+  .page-header h2{margin:0 0 2px;font-size:18px;}
+  .page-header p{margin:0;color:var(--text-dim);font-size:12.5px;}
+  .search-box{
+    background:var(--panel-alt);border:1px solid var(--border-light);border-radius:8px;padding:8px 10px;
+    color:var(--text);font-size:12.5px;width:100%;max-width:320px;font-family:'Inter';margin-bottom:10px;
+  }
+  .sev-filter{display:flex;gap:6px;margin-bottom:12px;}
+  .sev-filter button{background:var(--panel-alt);border:1px solid var(--border-light);color:var(--text-dim);
+    border-radius:7px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:600;}
+  .sev-filter button.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+
+  table.heatmap{border-collapse:collapse;width:100%;font-size:11.5px;}
+  table.heatmap th{padding:6px;font-size:10px;color:var(--text-dim);text-align:center;border-bottom:1px solid var(--border-light);}
+  table.heatmap th:first-child{text-align:left;}
+  table.heatmap td{padding:8px;text-align:center;border:1px solid var(--border);color:var(--text);font-weight:600;}
+  table.heatmap th:first-child, table.heatmap td:first-child{text-align:left;font-weight:700;color:var(--text-dim);white-space:nowrap;}
+
+  .report-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0;}
+  .report-stat{background:var(--panel-alt);border:1px solid var(--border-light);border-radius:8px;padding:10px;}
+  .report-stat b{display:block;font-size:18px;}
+  .report-stat span{font-size:11px;color:var(--text-dim);}
+  .report-actions{display:flex;gap:10px;margin-top:14px;}
+  .btn-primary{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;}
+  .btn-secondary{background:var(--panel-alt);color:var(--text);border:1px solid var(--border-light);border-radius:8px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;}
+
+  .chat-page-wrap{display:flex;flex-direction:column;height:calc(100vh - 150px);}
+  .chat-page-messages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:6px 2px 14px;}
+  .msg{max-width:72%;padding:10px 13px;border-radius:11px;font-size:13px;line-height:1.55;}
+  .msg.user{align-self:flex-end;background:var(--blue);color:#fff;border-bottom-right-radius:3px;}
+  .msg.assistant{align-self:flex-start;background:var(--panel-alt);border:1px solid var(--border-light);border-bottom-left-radius:3px;}
+
+  /* ---------------- MODAL ---------------- */
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(4,8,18,0.65);display:flex;align-items:center;justify-content:center;
+    z-index:100;padding:20px;
+  }
+  .modal-overlay.hidden{display:none;}
+  .modal-box{background:var(--panel);border:1px solid var(--border-light);border-radius:12px;width:100%;max-width:520px;max-height:86vh;overflow-y:auto;}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--border);}
+  .modal-head h3{margin:0;font-size:16px;}
+  .modal-close{background:var(--panel-alt);border:1px solid var(--border-light);border-radius:7px;width:28px;height:28px;color:var(--text);cursor:pointer;}
+  .modal-body{padding:16px 18px;}
+  .modal-tabs{display:flex;gap:6px;margin-bottom:14px;}
+  .modal-tabs button{flex:1;background:var(--panel-alt);border:1px solid var(--border-light);color:var(--text-dim);
+    padding:8px;border-radius:7px;font-size:12.5px;cursor:pointer;font-weight:600;}
+  .modal-tabs button.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+  .modal-pane{display:none;}
+  .modal-pane.active{display:block;}
+  .modal-pane textarea{
+    width:100%;min-height:140px;background:var(--panel-alt);border:1px solid var(--border-light);border-radius:8px;
+    color:var(--text);font-family:monospace;font-size:11.5px;padding:10px;resize:vertical;
+  }
+  .modal-help{font-size:11px;color:var(--text-faint);margin-top:8px;line-height:1.5;}
+  .modal-error{color:var(--red);font-size:12px;margin-top:8px;min-height:14px;}
+  .modal-body input[type=file]{color:var(--text-dim);font-size:12px;}
+  .info-modal-body{font-size:12.5px;line-height:1.6;color:var(--text-dim);}
+  .info-modal-body .rec-item, .info-modal-body .alert-item{margin-bottom:10px;}
+
+  #toast{
+    position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--panel);
+    border:1px solid var(--border-light);color:var(--text);padding:11px 18px;border-radius:9px;font-size:13px;
+    opacity:0;pointer-events:none;transition:all .25s ease;z-index:200;box-shadow:0 10px 30px rgba(0,0,0,0.4);
+  }
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  @media print{
+    .sidebar, .topbar .filters-bar, .btn-reset, #toast{display:none !important;}
+  }
+
+  @media (max-width:1150px){
+    .overview-grid{grid-template-columns:1fr;}
+    .kpi-row{grid-template-columns:repeat(3,1fr);}
+    .chart-row, .breakdown-grid{grid-template-columns:1fr;}
+  }
+  @media (max-width:640px){
+    .kpi-row{grid-template-columns:repeat(2,1fr);}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/></svg></div>
+      <div class="brand-text"><h1>InsightEdge</h1><small>Quality Intelligence</small></div>
+    </div>
+    <nav class="nav" id="navList"></nav>
+    <div class="data-overview">
+      <h4>Data Overview</h4>
+      <div class="do-row"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg><div><b id="doRange">—</b>Data Range</div></div>
+      <div class="do-row"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><path d="M4 19h16M4 5h16M4 12h10"/></svg><div><b id="doRecords">—</b>Total Records</div></div>
+      <div class="do-row"><svg viewBox="0 0 24 24" fill="none" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg><div><b id="doUpdated">—</b>Last Updated</div></div>
+      <button class="refresh-btn" onclick="openModal('refreshModal')">Refresh Data</button>
+    </div>
+  </aside>
+
+  <!-- ================= MAIN ================= -->
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-title">
+        <h1 id="pageTitle">Executive Dashboard</h1>
+        <p id="pageSubtitle">Real-time overview of quality performance</p>
+      </div>
+      <div class="filters-bar">
+        <div class="field"><span>Date Range</span>
+          <select id="fDateRange"><option value="24">Jul '23 – Jun '25 (Full)</option><option value="12">Last 12 Months</option><option value="6">Last 6 Months</option><option value="3">Last 3 Months</option></select>
+        </div>
+        <div class="field"><span>Location</span><select id="fLocation"></select></div>
+        <div class="field"><span>Process</span><select id="fProcess"></select></div>
+        <div class="field"><span>Machine</span><select id="fMachine"></select></div>
+        <div class="field"><span>Part</span><select id="fPart"></select></div>
+        <button class="btn-reset" onclick="resetFilters()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 4v6h6"/></svg>Reset Filters</button>
+      </div>
+    </div>
+
+    <!-- ============ OVERVIEW ============ -->
+    <section class="page active" id="page-overview">
+      <div class="overview-grid">
+        <div class="left-col">
+          <div class="kpi-row" id="kpiRow"></div>
+
+          <div class="chart-row">
+            <div class="panel">
+              <div class="panel-head"><h2>Monthly Rejection Trend</h2><span class="hint">Qty &amp; PPM</span></div>
+              <div class="panel-body"><div class="chart-box"><canvas id="trendChart"></canvas></div></div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><h2>Top Defects (Pareto)</h2><span class="hint">80/20 rule</span></div>
+              <div class="panel-body"><div class="chart-box"><canvas id="paretoChart"></canvas></div></div>
+            </div>
+          </div>
+
+          <div class="breakdown-grid">
+            <div class="panel">
+              <div class="panel-head"><h2>Rejections by Process</h2></div>
+              <div class="panel-body"><div class="chart-box small"><canvas id="processChart"></canvas></div></div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><h2>Rejections by Machine (Top 10)</h2></div>
+              <div class="panel-body"><div class="chart-box small"><canvas id="machineChart"></canvas></div></div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><h2>Rejections by Location</h2></div>
+              <div class="panel-body"><div class="chart-box small"><canvas id="locationChart"></canvas></div></div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><h2>Rejection Cost Trend (₹)</h2></div>
+              <div class="panel-body"><div class="chart-box small"><canvas id="costTrendChart"></canvas></div></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><h2>Top Rejected Parts</h2><span class="hint" id="topPartsCount"></span></div>
+            <div class="panel-body">
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead><tr><th>#</th><th>Part No.</th><th>Part Name</th><th>Rejection Qty</th><th>PPM</th><th>Rejection Cost</th><th>Trend</th></tr></thead>
+                  <tbody id="topPartsBody"></tbody>
+                </table>
+              </div>
+              <div style="text-align:right;margin-top:10px;"><button class="link-btn" onclick="setActiveTab('part')">View All Parts →</button></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="right-col">
+          <div class="panel">
+            <div class="panel-head"><h2>AI Quality Summary</h2></div>
+            <div class="panel-body">
+              <div id="aiSummaryBadge"></div>
+              <p class="insight-text" id="aiSummaryText">Loading…</p>
+              <ul class="insight-bullets" id="aiSummaryBullets"></ul>
+              <div style="margin-top:10px;"><button class="ai-btn" id="aiSummaryBtn" onclick="generateAIInsights()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg>View Full Insights</button></div>
+              <div class="modal-error" id="aiSummaryError"></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><h2>Recommended Actions</h2></div>
+            <div class="panel-body">
+              <div class="rec-list" id="recList"></div>
+              <div style="margin-top:10px;"><button class="link-btn" onclick="openAllRecommendationsModal()">View All Recommendations →</button></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><h2>Alerts</h2><button class="link-btn" onclick="setActiveTab('alerts')">View All</button></div>
+            <div class="panel-body"><div class="alert-list" id="alertList"></div></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><h2>AI Chatbot</h2></div>
+            <div class="panel-body">
+              <div class="chat-chips">
+                <span class="chip" onclick="goToChatWithMessage('Why did PPM increase this month?')">Why did PPM increase this month?</span>
+                <span class="chip" onclick="goToChatWithMessage('Which part has the highest rejection cost?')">Which part has highest rejection cost?</span>
+                <span class="chip" onclick="goToChatWithMessage('Show top 5 defects in the Press process')">Show top 5 defects in Press process</span>
+                <span class="chip" onclick="goToChatWithMessage('Compare Pune vs Nashik performance')">Compare Pune vs Nashik performance</span>
+              </div>
+              <div class="chat-input-row">
+                <input id="miniChatInput" placeholder="Ask anything about your quality data…" onkeydown="if(event.key==='Enter')sendFromMiniChat()" />
+                <button class="chat-send" onclick="sendFromMiniChat()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PART ANALYSIS ============ -->
+    <section class="page" id="page-part">
+      <div class="page-header"><h2>Part Analysis</h2><p>Every part in the current filter selection, ranked by risk score.</p></div>
+      <input class="search-box" id="partSearch" placeholder="Search part number or name…" oninput="renderPartAnalysis(getFiltered())" />
+      <div class="panel"><div class="panel-body"><div class="table-wrap">
+        <table class="data-table">
+          <thead><tr>
+            <th>#</th><th class="sortable" onclick="setPartSort('partNo')">Part No.</th><th>Part Name</th><th>Process</th><th>Machine</th><th>Location</th>
+            <th class="sortable" onclick="setPartSort('totalRejected')">Rejection Qty</th><th class="sortable" onclick="setPartSort('ppm')">PPM</th>
+            <th class="sortable" onclick="setPartSort('totalCost')">Rejection Cost</th><th>Trend</th>
+          </tr></thead>
+          <tbody id="allPartsBody"></tbody>
+        </table>
+      </div></div></div>
+    </section>
+
+    <!-- ============ DEFECT ANALYSIS ============ -->
+    <section class="page" id="page-defect">
+      <div class="page-header"><h2>Defect Analysis</h2><p>Pareto breakdown of defect modes across the current selection.</p></div>
+      <div class="chart-row">
+        <div class="panel"><div class="panel-head"><h2>Defect Pareto</h2></div><div class="panel-body"><div class="chart-box"><canvas id="defectAnalysisChart"></canvas></div></div></div>
+        <div class="panel"><div class="panel-head"><h2>Leading Defect — Monthly Trend</h2></div><div class="panel-body"><div class="chart-box"><canvas id="defectTrendChart"></canvas></div></div></div>
+      </div>
+      <div class="panel" style="margin-top:14px;"><div class="panel-body"><div class="table-wrap">
+        <table class="data-table"><thead><tr><th>#</th><th>Defect</th><th>Qty</th><th>Share</th><th>Cumulative</th><th>Cost</th></tr></thead><tbody id="defectAnalysisBody"></tbody></table>
+      </div></div></div>
+    </section>
+
+    <!-- ============ PROCESS / MACHINE / LOCATION ============ -->
+    <section class="page" id="page-process">
+      <div class="page-header"><h2>Process Analysis</h2><p>Rejection volume, cost and PPM by manufacturing process.</p></div>
+      <div class="panel"><div class="panel-body"><div class="chart-box"><canvas id="processAnalysisChart"></canvas></div></div></div>
+      <div class="panel" style="margin-top:14px;"><div class="panel-body"><div class="table-wrap">
+        <table class="data-table"><thead><tr><th>#</th><th>Process</th><th>Rejected</th><th>Inspected</th><th>PPM</th><th>Cost</th></tr></thead><tbody id="processAnalysisBody"></tbody></table>
+      </div></div></div>
+    </section>
+
+    <section class="page" id="page-machine">
+      <div class="page-header"><h2>Machine Analysis</h2><p>Rejection volume, cost and PPM by machine.</p></div>
+      <div class="panel"><div class="panel-body"><div class="chart-box"><canvas id="machineAnalysisChart"></canvas></div></div></div>
+      <div class="panel" style="margin-top:14px;"><div class="panel-body"><div class="table-wrap">
+        <table class="data-table"><thead><tr><th>#</th><th>Machine</th><th>Rejected</th><th>Inspected</th><th>PPM</th><th>Cost</th></tr></thead><tbody id="machineAnalysisBody"></tbody></table>
+      </div></div></div>
+    </section>
+
+    <section class="page" id="page-location">
+      <div class="page-header"><h2>Location Analysis</h2><p>Rejection volume, cost and PPM by plant location.</p></div>
+      <div class="panel"><div class="panel-body"><div class="chart-box"><canvas id="locationAnalysisChart"></canvas></div></div></div>
+      <div class="panel" style="margin-top:14px;"><div class="panel-body"><div class="table-wrap">
+        <table class="data-table"><thead><tr><th>#</th><th>Location</th><th>Rejected</th><th>Inspected</th><th>PPM</th><th>Cost</th></tr></thead><tbody id="locationAnalysisBody"></tbody></table>
+      </div></div></div>
+    </section>
+
+    <!-- ============ COST ANALYSIS ============ -->
+    <section class="page" id="page-cost">
+      <div class="page-header"><h2>Cost Analysis</h2><p>Cost of poor quality broken down by category and over time.</p></div>
+      <div class="chart-row">
+        <div class="panel"><div class="panel-head"><h2>Cost of Poor Quality</h2></div><div class="panel-body"><div class="chart-box"><canvas id="cpqChart"></canvas></div></div></div>
+        <div class="panel"><div class="panel-head"><h2>Cost Trend</h2></div><div class="panel-body"><div class="chart-box"><canvas id="costAnalysisTrendChart"></canvas></div></div></div>
+      </div>
+      <div class="panel" style="margin-top:14px;"><div class="panel-head"><h2>Cost by Process</h2></div><div class="panel-body"><div class="table-wrap">
+        <table class="data-table"><thead><tr><th>#</th><th>Process</th><th>Rejection Cost</th><th>Debit Cost</th></tr></thead><tbody id="costByProcessBody"></tbody></table>
+      </div></div></div>
+    </section>
+
+    <!-- ============ ROOT CAUSE ============ -->
+    <section class="page" id="page-rootcause">
+      <div class="page-header"><h2>Root Cause Matrix</h2><p>Process × Defect concentration — darker cells indicate a stronger association.</p></div>
+      <div class="panel"><div class="panel-body" id="rootCauseBody" style="overflow-x:auto;"></div></div>
+    </section>
+
+    <!-- ============ ALERTS ============ -->
+    <section class="page" id="page-alerts">
+      <div class="page-header"><h2>Alerts</h2><p>All abnormal quality trends detected in the current selection.</p></div>
+      <div class="sev-filter">
+        <button class="active" data-sev="all" onclick="setAlertFilter('all')">All</button>
+        <button data-sev="critical" onclick="setAlertFilter('critical')">Critical</button>
+        <button data-sev="watch" onclick="setAlertFilter('watch')">Watch</button>
+      </div>
+      <div class="panel"><div class="panel-body"><div class="alert-list" id="alertsPageBody"></div></div></div>
+    </section>
+
+    <!-- ============ REPORTS ============ -->
+    <section class="page" id="page-reports">
+      <div class="page-header"><h2>Reports</h2><p>Export or print a summary of the current filtered view.</p></div>
+      <div class="panel"><div class="panel-body">
+        <p class="insight-text" id="reportSummary"></p>
+        <div class="report-stats" id="reportStats"></div>
+        <div class="report-actions">
+          <button class="btn-primary" onclick="downloadCSV()">Download CSV</button>
+          <button class="btn-secondary" onclick="window.print()">Print Report</button>
+        </div>
+      </div></div>
+    </section>
+
+    <!-- ============ AI CHATBOT (full page) ============ -->
+    <section class="page" id="page-chatbot">
+      <div class="page-header"><h2>AI Chatbot</h2><p>Ask questions about the current filtered dataset in plain language.</p></div>
+      <div class="panel">
+        <div class="panel-body chat-page-wrap">
+          <div class="chat-page-messages" id="chatPageMessages"></div>
+          <div class="chat-input-row">
+            <input id="chatPageInput" placeholder="Ask about rejection rates, defects, machines, cost…" onkeydown="if(event.key==='Enter')sendChatMessage()" />
+            <button class="chat-send" id="chatPageSendBtn" onclick="sendChatMessage()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ================= REFRESH DATA MODAL ================= -->
+<div class="modal-overlay hidden" id="refreshModal">
+  <div class="modal-box">
+    <div class="modal-head"><h3>Refresh Data</h3><button class="modal-close" onclick="closeModal('refreshModal')">✕</button></div>
+    <div class="modal-body">
+      <div class="modal-tabs">
+        <button class="active" data-tab="gen" onclick="setModalTab('gen')">Generate Sample</button>
+        <button data-tab="json" onclick="setModalTab('json')">Paste JSON</button>
+        <button data-tab="csv" onclick="setModalTab('csv')">Upload CSV</button>
+      </div>
+      <div class="modal-pane active" id="modalPane-gen">
+        <p class="insight-text">Simulate the next month's inspection data coming in. The 24-month window rolls forward by one month and every chart, KPI and recommendation refreshes to match — a way to see the dashboard update live without needing a real file.</p>
+        <button class="btn-primary" onclick="regenerateSample()">Simulate Next Month's Data</button>
+      </div>
+      <div class="modal-pane" id="modalPane-json">
+        <textarea id="jsonInput" placeholder='[{"month":"2025-06","location":"Pune","process":"Press","machine":"M-04","part_no":"ABC-10231","part_name":"Bracket - L","unit_cost":220,"inspected":3200,"rejected":88,"defect":"Burr"}, ...]'></textarea>
+        <div class="modal-help">Each record: month, location, process, machine, part_no, part_name, unit_cost, inspected, rejected, defect (single dominant defect for that row). Missing cost/debit_cost fields are estimated automatically.</div>
+        <div class="modal-error" id="jsonError"></div>
+        <div style="margin-top:10px;"><button class="btn-primary" onclick="applyPastedJSON()">Apply JSON</button></div>
+      </div>
+      <div class="modal-pane" id="modalPane-csv">
+        <p class="insight-text">Upload a CSV with one row per part, per month.</p>
+        <input type="file" id="csvInput" accept=".csv" />
+        <div class="modal-help">Expected headers: month, location, process, machine, part_no, part_name, unit_cost, inspected, rejected, defect</div>
+        <div class="modal-error" id="csvError"></div>
+        <div style="margin-top:10px;"><button class="btn-primary" onclick="applyCSVUpload()">Apply CSV</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= GENERIC INFO MODAL ================= -->
+<div class="modal-overlay hidden" id="infoModal">
+  <div class="modal-box">
+    <div class="modal-head"><h3 id="infoModalTitle">Details</h3><button class="modal-close" onclick="closeModal('infoModal')">✕</button></div>
+    <div class="modal-body"><div class="info-modal-body" id="infoModalBody"></div></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ============================================================================
+   COLORS / ICONS / CONSTANTS
+   ============================================================================ */
+const C = { blue:'#3B82F6', purple:'#8B7CF6', teal:'#22C58B', amber:'#F5A524', red:'#EF4444', pink:'#EC4899', grid:'rgba(255,255,255,0.06)', text:'#8B96AC' };
+
+const ICONS = {
+  box: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>`,
+  gauge: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 13l4-4"/></svg>`,
+  currency: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 4h10"/><path d="M7 4c6 0 6 8 0 8h6l-6 8"/></svg>`,
+  currencyAlt: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg>`,
+  percent: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.3"/><circle cx="17.5" cy="17.5" r="2.3"/></svg>`,
+  shield: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l7 3v6c0 5-3.5 7.5-7 9-3.5-1.5-7-4-7-9V6l7-3z"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>`,
+  overview: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>`,
+  part: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v2h6V3M8 9h8M8 13h8M8 17h5"/></svg>`,
+  defect: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86l-8.18 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.89-3.14l-8.18-14a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>`,
+  process: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20a8 8 0 1 0-8-8"/><path d="M4 12H2M12 4V2M12 22v-2M22 12h-2"/></svg>`,
+  machine: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg>`,
+  location: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 1 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`,
+  cost: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 9.5a2.5 2 0 0 1 2.5-1.5h1a2.5 2 0 0 1 0 5h-1a2.5 2 0 0 0 0 5h1a2.5 2 0 0 0 2.5-1.5"/></svg>`,
+  root: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22V12M12 12L4 7M12 12l8-5M12 12L4 17M12 12l8 5"/></svg>`,
+  alert: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`,
+  reports: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg>`,
+  chat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`,
+};
+
+const NAV_ITEMS = [
+  {id:'overview', label:'Overview', icon:ICONS.overview, title:'Executive Dashboard', sub:"Real-time overview of quality performance"},
+  {id:'part', label:'Part Analysis', icon:ICONS.part, title:'Part Analysis', sub:'Deep dive into individual part rejection performance'},
+  {id:'defect', label:'Defect Analysis', icon:ICONS.defect, title:'Defect Analysis', sub:'Pareto and trend analysis of defect modes'},
+  {id:'process', label:'Process Analysis', icon:ICONS.process, title:'Process Analysis', sub:'Rejection performance by manufacturing process'},
+  {id:'machine', label:'Machine Analysis', icon:ICONS.machine, title:'Machine Analysis', sub:'Rejection performance by machine'},
+  {id:'location', label:'Location Analysis', icon:ICONS.location, title:'Location Analysis', sub:'Rejection performance by plant location'},
+  {id:'cost', label:'Cost Analysis', icon:ICONS.cost, title:'Cost Analysis', sub:'Cost of poor quality breakdown'},
+  {id:'rootcause', label:'Root Cause', icon:ICONS.root, title:'Root Cause Matrix', sub:'Process × defect concentration analysis'},
+  {id:'alerts', label:'Alerts', icon:ICONS.alert, title:'Alerts', sub:'Abnormal quality trend detection'},
+  {id:'quality-metrics', label:'Quality Metrics', icon:ICONS.metrics, title:'Quality Metrics', sub:'Key quality performance indicators'},
+  {id:'chatbot', label:'AI Chatbot', icon:ICONS.chat, title:'AI Chatbot', sub:'Ask questions about your quality data'},
+];
+
+const LOCATIONS = ['Pune','Nashik','Chennai','Ahmedabad','Bangalore'];
+const PROCESSES = ['Press','Welding','Machining','Assembly','Heat Treatment'];
+const DEFECTS = ['Burr','Dent','Scratch','Crack','Dimensional Issue','Surface Defect','Others'];
+const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/* ============================================================================
+   STATE
+   ============================================================================ */
+let MONTHS = [];
+let PARTS = [];
+let RECORDS = [];
+let lastUpdated = new Date(2026, 6, 28);
+let currentTab = 'overview';
+let filters = { dateRange:'24', location:'All', process:'All', machine:'All', part:'All' };
+let aiState = { summaryUsed:false, summaryText:null, summaryBullets:null };
+let chatHistory = [];
+let alertFilterState = 'all';
+let partSort = { key:'totalRejected', dir:'desc' };
+let toastTimer = null;
+const chartRegistry = {};
+
+/* ============================================================================
+   CURATED, DETERMINISTIC DATASET
+   Every number below is computed from fixed, hand-set parameters (base rate,
+   monthly trend, seasonal amplitude/phase, unit cost, debit ratio) rather than
+   randomness, so the dataset is internally consistent and reproducible every
+   time this file is opened — safe to share as-is. Swap PART_DEFS for your own
+   pandas export, or use "Refresh Data" in the sidebar to load real records.
+   ============================================================================ */
+let monthOffset = 0;
+
+const PART_DEFS = [
+  {partNo:'ABC-10231', partName:'Bracket - Engine Mount',     process:'Press',          machine:'M-01', location:'Pune',       unitCost:210, dominantDefect:'Burr',              secondaryDefect:'Dent',              baseRate:0.014, trendPerMonth:0.00090, seasonalAmp:0.0030, phase:0, baseVolume:3200, volSeasonalAmp:300, volPhase:2, debitRatio:0.42},
+  {partNo:'DEF-20418', partName:'Cover - Timing Chain',       process:'Welding',        machine:'M-05', location:'Nashik',     unitCost:380, dominantDefect:'Crack',             secondaryDefect:'Surface Defect',    baseRate:0.010, trendPerMonth:0.00020, seasonalAmp:0.0020, phase:3, baseVolume:2400, volSeasonalAmp:200, volPhase:1, debitRatio:0.50},
+  {partNo:'GHI-30455', partName:'Plate - Chassis Side',       process:'Machining',      machine:'M-07', location:'Chennai',    unitCost:260, dominantDefect:'Dimensional Issue', secondaryDefect:'Scratch',           baseRate:0.018, trendPerMonth:0.00110, seasonalAmp:0.0025, phase:1, baseVolume:3600, volSeasonalAmp:250, volPhase:0, debitRatio:0.38},
+  {partNo:'JKL-40522', partName:'Support - Radiator',         process:'Assembly',       machine:'M-11', location:'Ahmedabad',  unitCost:150, dominantDefect:'Dent',              secondaryDefect:'Surface Defect',    baseRate:0.009, trendPerMonth:-0.00040, seasonalAmp:0.0015, phase:4, baseVolume:2800, volSeasonalAmp:180, volPhase:3, debitRatio:0.45},
+  {partNo:'MNO-50678', partName:'Housing - Differential',     process:'Heat Treatment', machine:'M-13', location:'Bangalore',  unitCost:520, dominantDefect:'Crack',             secondaryDefect:'Dimensional Issue', baseRate:0.012, trendPerMonth:0.00030, seasonalAmp:0.0020, phase:2, baseVolume:1800, volSeasonalAmp:150, volPhase:2, debitRatio:0.55},
+  {partNo:'PQR-60123', partName:'Flange - Propeller Shaft',   process:'Machining',      machine:'M-08', location:'Pune',       unitCost:300, dominantDefect:'Scratch',           secondaryDefect:'Dimensional Issue', baseRate:0.008, trendPerMonth:-0.00020, seasonalAmp:0.0018, phase:5, baseVolume:2600, volSeasonalAmp:220, volPhase:1, debitRatio:0.40},
+  {partNo:'STU-70234', partName:'Clamp - Exhaust',            process:'Press',          machine:'M-02', location:'Nashik',     unitCost:95,  dominantDefect:'Burr',              secondaryDefect:'Dent',              baseRate:0.011, trendPerMonth:0.00010, seasonalAmp:0.0015, phase:0, baseVolume:4200, volSeasonalAmp:350, volPhase:4, debitRatio:0.35},
+  {partNo:'VWX-80345', partName:'Mount - Transmission',       process:'Welding',        machine:'M-06', location:'Chennai',    unitCost:410, dominantDefect:'Surface Defect',    secondaryDefect:'Crack',              baseRate:0.013, trendPerMonth:0.00070, seasonalAmp:0.0022, phase:3, baseVolume:2000, volSeasonalAmp:160, volPhase:0, debitRatio:0.48},
+  {partNo:'YZA-90456', partName:'Guide - Valve',               process:'Machining',      machine:'M-09', location:'Bangalore',  unitCost:180, dominantDefect:'Dimensional Issue', secondaryDefect:'Scratch',           baseRate:0.016, trendPerMonth:0.00100, seasonalAmp:0.0020, phase:1, baseVolume:3000, volSeasonalAmp:200, volPhase:2, debitRatio:0.40},
+  {partNo:'BCD-10567', partName:'Panel - Door Inner',          process:'Assembly',       machine:'M-12', location:'Ahmedabad',  unitCost:240, dominantDefect:'Dent',              secondaryDefect:'Surface Defect',    baseRate:0.007, trendPerMonth:-0.00030, seasonalAmp:0.0015, phase:4, baseVolume:2600, volSeasonalAmp:180, volPhase:1, debitRatio:0.50},
+  {partNo:'EFG-20678', partName:'Bracket - Suspension',        process:'Press',          machine:'M-03', location:'Pune',       unitCost:260, dominantDefect:'Burr',              secondaryDefect:'Dimensional Issue', baseRate:0.010, trendPerMonth:0.00020, seasonalAmp:0.0018, phase:2, baseVolume:3400, volSeasonalAmp:260, volPhase:3, debitRatio:0.42},
+  {partNo:'HIJ-30789', partName:'Cover - Gearbox',             process:'Welding',        machine:'M-05', location:'Nashik',     unitCost:350, dominantDefect:'Crack',             secondaryDefect:'Surface Defect',    baseRate:0.009, trendPerMonth:0.00010, seasonalAmp:0.0016, phase:0, baseVolume:2200, volSeasonalAmp:190, volPhase:4, debitRatio:0.50},
+  {partNo:'KLM-40890', partName:'Plate - Underbody',           process:'Machining',      machine:'M-07', location:'Chennai',    unitCost:290, dominantDefect:'Scratch',           secondaryDefect:'Dimensional Issue', baseRate:0.015, trendPerMonth:0.00080, seasonalAmp:0.0020, phase:1, baseVolume:3100, volSeasonalAmp:230, volPhase:2, debitRatio:0.38},
+  {partNo:'NOP-50901', partName:'Support - Battery Tray',      process:'Assembly',       machine:'M-10', location:'Bangalore',  unitCost:170, dominantDefect:'Surface Defect',    secondaryDefect:'Dent',              baseRate:0.0085, trendPerMonth:-0.00020, seasonalAmp:0.0015, phase:3, baseVolume:2500, volSeasonalAmp:200, volPhase:0, debitRatio:0.45},
+  {partNo:'QRS-61012', partName:'Housing - Steering Gear',     process:'Heat Treatment', machine:'M-14', location:'Ahmedabad',  unitCost:480, dominantDefect:'Crack',             secondaryDefect:'Dimensional Issue', baseRate:0.014, trendPerMonth:0.00090, seasonalAmp:0.0022, phase:2, baseVolume:1700, volSeasonalAmp:140, volPhase:1, debitRatio:0.55},
+  {partNo:'TUV-71123', partName:'Flange - Axle',               process:'Machining',      machine:'M-08', location:'Pune',       unitCost:310, dominantDefect:'Dimensional Issue', secondaryDefect:'Scratch',           baseRate:0.011, trendPerMonth:0.00020, seasonalAmp:0.0018, phase:4, baseVolume:2700, volSeasonalAmp:210, volPhase:3, debitRatio:0.40},
+  {partNo:'WXY-81234', partName:'Clamp - Fuel Line',           process:'Press',          machine:'M-01', location:'Nashik',     unitCost:80,  dominantDefect:'Burr',              secondaryDefect:'Surface Defect',    baseRate:0.012, trendPerMonth:0.00030, seasonalAmp:0.0016, phase:1, baseVolume:4500, volSeasonalAmp:380, volPhase:2, debitRatio:0.35},
+  {partNo:'ZAB-91345', partName:'Mount - Engine Cradle',       process:'Welding',        machine:'M-06', location:'Chennai',    unitCost:430, dominantDefect:'Surface Defect',    secondaryDefect:'Crack',              baseRate:0.010, trendPerMonth:-0.00040, seasonalAmp:0.0020, phase:0, baseVolume:1900, volSeasonalAmp:150, volPhase:4, debitRatio:0.50},
+  {partNo:'CDE-11456', partName:'Guide - Camshaft',            process:'Machining',      machine:'M-09', location:'Bangalore',  unitCost:200, dominantDefect:'Scratch',           secondaryDefect:'Dimensional Issue', baseRate:0.009, trendPerMonth:0.00020, seasonalAmp:0.0017, phase:3, baseVolume:2900, volSeasonalAmp:220, volPhase:1, debitRatio:0.40},
+  {partNo:'FGH-21567', partName:'Panel - Roof',                process:'Assembly',       machine:'M-11', location:'Ahmedabad',  unitCost:260, dominantDefect:'Dent',              secondaryDefect:'Surface Defect',    baseRate:0.0075, trendPerMonth:0.00010, seasonalAmp:0.0015, phase:2, baseVolume:2400, volSeasonalAmp:170, volPhase:0, debitRatio:0.48},
+];
+
+function buildMonths(offset){
+  const arr = [];
+  let y = 2023, m = 6 + offset;
+  while(m > 11){ m -= 12; y += 1; }
+  while(m < 0){ m += 12; y -= 1; }
+  for(let i=0;i<24;i++){
+    arr.push({idx:i, absIdx: offset+i, y, m, label:`${MONTH_NAMES[m]} '${String(y).slice(2)}`});
+    m++; if(m>11){ m=0; y++; }
+  }
+  return arr;
+}
+
+function buildDataset(offset){
+  monthOffset = offset;
+  MONTHS = buildMonths(offset);
+  PARTS = PART_DEFS.map(p=>({partNo:p.partNo, partName:p.partName, process:p.process, machine:p.machine, location:p.location, unitCost:p.unitCost}));
+
+  RECORDS = [];
+  PART_DEFS.forEach(p=>{
+    MONTHS.forEach(mo=>{
+      const a = mo.absIdx;
+      let rate = p.baseRate + p.trendPerMonth*a + p.seasonalAmp*Math.sin(2*Math.PI*(a+p.phase)/12);
+      rate = Math.max(0.0008, Math.min(0.09, rate));
+      let inspected = Math.round(p.baseVolume + p.volSeasonalAmp*Math.sin(2*Math.PI*(a+p.volPhase)/12));
+      inspected = Math.max(500, inspected);
+      const rejected = Math.round(inspected*rate);
+      const domQty = Math.round(rejected*0.55);
+      const secQty = Math.round(rejected*0.30);
+      const othersQty = Math.max(0, rejected - domQty - secQty);
+      const cost = rejected * p.unitCost;
+      const debitCost = Math.round(cost * p.debitRatio);
+      RECORDS.push({
+        monthIdx:mo.idx, monthLabel:mo.label,
+        location:p.location, process:p.process, machine:p.machine, partNo:p.partNo, partName:p.partName, unitCost:p.unitCost,
+        inspected, rejected, cost, debitCost,
+        defects:[
+          {defect:p.dominantDefect, qty:domQty},
+          {defect:p.secondaryDefect, qty:secQty},
+          {defect:'Others', qty:othersQty},
+        ],
+      });
+    });
+  });
+}
+buildDataset(0);
+
+/* ============================================================================
+   FORMAT HELPERS
+   ============================================================================ */
+function fmtNum(v){ if(v==null || isNaN(v)) return '—'; return Math.round(v).toLocaleString('en-IN'); }
+function fmtINR(v){
+  if(v==null || isNaN(v)) return '—';
+  const sign = v<0 ? '-' : ''; v = Math.abs(v);
+  if(v>=1e7) return `${sign}₹${(v/1e7).toFixed(2)} Cr`;
+  if(v>=1e5) return `${sign}₹${(v/1e5).toFixed(2)} L`;
+  return `${sign}₹${Math.round(v).toLocaleString('en-IN')}`;
+}
+function fmtINRShort(v){
+  if(v>=1e7) return `${(v/1e7).toFixed(1)}Cr`;
+  if(v>=1e5) return `${(v/1e5).toFixed(0)}L`;
+  if(v>=1000) return `${(v/1000).toFixed(0)}K`;
+  return `${Math.round(v)}`;
+}
+function pctDelta(cur, prev){ if(prev==null || prev===0) return null; return (cur-prev)/prev*100; }
+function hexAlpha(hex, alpha){
+  const h = hex.replace('#','');
+  const r = parseInt(h.substring(0,2),16), g = parseInt(h.substring(2,4),16), b = parseInt(h.substring(4,6),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+function meanStd(arr){
+  if(!arr.length) return {mean:0, std:0};
+  const m = arr.reduce((a,b)=>a+b,0)/arr.length;
+  const v = arr.reduce((a,b)=>a+(b-m)**2,0)/arr.length;
+  return {mean:m, std:Math.sqrt(v)};
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ============================================================================
+   FILTERING
+   ============================================================================ */
+function monthRange(){
+  const total = MONTHS.length;
+  const preset = filters.dateRange;
+  if(preset==='3') return [Math.max(0,total-3), total-1];
+  if(preset==='6') return [Math.max(0,total-6), total-1];
+  if(preset==='12') return [Math.max(0,total-12), total-1];
+  return [0, total-1];
+}
+function matchesFilters(r){
+  return (filters.location==='All' || r.location===filters.location) &&
+         (filters.process==='All' || r.process===filters.process) &&
+         (filters.machine==='All' || r.machine===filters.machine) &&
+         (filters.part==='All' || r.partNo===filters.part);
+}
+function getFiltered(){
+  const [lo,hi] = monthRange();
+  return RECORDS.filter(r=> r.monthIdx>=lo && r.monthIdx<=hi && matchesFilters(r));
+}
+function getPrevFiltered(){
+  const [lo,hi] = monthRange();
+  const len = hi-lo+1;
+  const prevHi = lo-1, prevLo = prevHi-len+1;
+  if(prevLo<0) return null;
+  return RECORDS.filter(r=> r.monthIdx>=prevLo && r.monthIdx<=prevHi && matchesFilters(r));
+}
+
+/* ============================================================================
+   AGGREGATION
+   ============================================================================ */
+function sumAgg(records){
+  return records.reduce((a,r)=>({inspected:a.inspected+r.inspected, rejected:a.rejected+r.rejected, cost:a.cost+r.cost, debitCost:a.debitCost+r.debitCost}),
+    {inspected:0, rejected:0, cost:0, debitCost:0});
+}
+function monthlySeries(records){
+  const map = new Map();
+  records.forEach(r=>{
+    if(!map.has(r.monthIdx)) map.set(r.monthIdx, {monthIdx:r.monthIdx, monthLabel:r.monthLabel, inspected:0, rejected:0, cost:0, debitCost:0});
+    const e = map.get(r.monthIdx);
+    e.inspected += r.inspected; e.rejected += r.rejected; e.cost += r.cost; e.debitCost += r.debitCost;
+  });
+  return Array.from(map.values()).sort((a,b)=>a.monthIdx-b.monthIdx)
+    .map(e=>({...e, ppm: e.inspected? e.rejected/e.inspected*1e6 : 0, rate: e.inspected? e.rejected/e.inspected*100 : 0}));
+}
+function paretoData(records){
+  const map = new Map();
+  records.forEach(r=> r.defects.forEach(d=>{
+    const e = map.get(d.defect) || {defect:d.defect, qty:0, cost:0};
+    e.qty += d.qty; e.cost += d.qty * r.unitCost;
+    map.set(d.defect, e);
+  }));
+  const arr = Array.from(map.values()).sort((a,b)=>b.qty-a.qty);
+  const total = arr.reduce((s,d)=>s+d.qty,0);
+  let cum = 0;
+  return arr.map(d=>{ cum += d.qty; return {...d, pct: total? d.qty/total*100 : 0, cumPct: total? cum/total*100 : 0}; });
+}
+function breakdownBy(records, key){
+  const map = new Map();
+  records.forEach(r=>{
+    const k = r[key];
+    const e = map.get(k) || {name:k, rejected:0, cost:0, inspected:0, debitCost:0};
+    e.rejected += r.rejected; e.cost += r.cost; e.inspected += r.inspected; e.debitCost += r.debitCost;
+    map.set(k, e);
+  });
+  return Array.from(map.values()).map(e=>({...e, ppm: e.inspected? e.rejected/e.inspected*1e6 : 0})).sort((a,b)=>b.rejected-a.rejected);
+}
+function partStatsFrom(records){
+  const map = new Map();
+  records.forEach(r=>{
+    if(!map.has(r.partNo)) map.set(r.partNo, {partNo:r.partNo, partName:r.partName, process:r.process, machine:r.machine, location:r.location, unitCost:r.unitCost, months:[]});
+    map.get(r.partNo).months.push(r);
+  });
+  return Array.from(map.values()).map(p=>{
+    const ms = p.months.sort((a,b)=>a.monthIdx-b.monthIdx);
+    const totalInspected = ms.reduce((s,m)=>s+m.inspected,0);
+    const totalRejected = ms.reduce((s,m)=>s+m.rejected,0);
+    const totalCost = ms.reduce((s,m)=>s+m.cost,0);
+    const ppm = totalInspected? totalRejected/totalInspected*1e6 : 0;
+    const rates = ms.map(m=> m.inspected? m.rejected/m.inspected : 0);
+    const first = rates[0]||0, last = rates[rates.length-1]||0;
+    const delta = last-first;
+    let trend = 'stable';
+    if(delta > first*0.4+0.003) trend = 'critical';
+    else if(delta < -(first*0.3+0.002)) trend = 'improving';
+    else if(delta > 0.001) trend = 'watch';
+    const defectTotals = {};
+    ms.forEach(m=> m.defects.forEach(d=>{ defectTotals[d.defect] = (defectTotals[d.defect]||0) + d.qty; }));
+    const sortedDefects = Object.entries(defectTotals).sort((a,b)=>b[1]-a[1]);
+    const dominantDefect = sortedDefects[0] ? sortedDefects[0][0] : '—';
+    const dominantShare = totalRejected ? ((sortedDefects[0]?sortedDefects[0][1]:0)/totalRejected*100) : 0;
+    const riskScore = (ppm/1000) * (trend==='critical'?1.6:trend==='watch'?1.2:trend==='improving'?0.5:1) + totalCost/5000;
+    return {...p, totalInspected, totalRejected, totalCost, ppm, trend, dominantDefect, dominantShare, riskScore, rateSeries:rates};
+  }).sort((a,b)=>b.riskScore-a.riskScore);
+}
+function computeSigma(series){
+  const rates = series.map(s=>s.rate);
+  const baseline = rates.slice(0, Math.max(1, rates.length-1));
+  const {mean, std} = meanStd(baseline);
+  const latest = rates[rates.length-1] || 0;
+  return std>0 ? (latest-mean)/std : 0;
+}
+function computeAlerts(sigma, partStats, pareto){
+  const list = [];
+  if(sigma>2) list.push({sev:'critical', text:`Overall rejection rate is ${sigma.toFixed(1)}σ above its recent baseline — outside normal process variation.`, time:'2h ago'});
+  else if(sigma>1) list.push({sev:'watch', text:`Rejection rate is trending up (${sigma.toFixed(1)}σ vs baseline) — worth monitoring.`, time:'4h ago'});
+  partStats.filter(p=>p.trend==='critical').slice(0,3).forEach((p,i)=>
+    list.push({sev:'critical', text:`${p.machine} / ${p.partNo} rejection rate rising sharply — dominant defect ${p.dominantDefect} at ${p.dominantShare.toFixed(0)}% share.`, time:`${i+1}d ago`}));
+  const top = pareto[0];
+  if(top && top.pct>35) list.push({sev:'watch', text:`${top.defect} accounts for ${top.pct.toFixed(0)}% of all rejected units in this view.`, time:'6h ago'});
+  partStats.filter(p=>p.trend==='improving').slice(0,1).forEach(p=>
+    list.push({sev:'watch', text:`${p.partNo} is improving — rejection rate trending down. Consider documenting the change made on ${p.machine}.`, time:'1d ago'}));
+  return list;
+}
+function computeRecommendations(partStats, pareto){
+  const ACTION_MAP = {
+    'Burr':'inspect deburring process and die/tool edge condition',
+    'Dent':'review material handling, racking and transfer procedures',
+    'Scratch':'audit surface protection during handling and transport',
+    'Crack':'inspect material handling and heat-treatment cycle profile',
+    'Dimensional Issue':'audit tooling wear and machine calibration',
+    'Surface Defect':'review cutting/finishing parameters and tool sharpness',
+    'Others':'conduct a broader root-cause review across shifts and operators',
+  };
+  const recs = [];
+  partStats.filter(p=>p.trend==='critical').slice(0,2).forEach(p=>
+    recs.push({priority:'High', title:`Inspect ${p.machine} for ${p.dominantDefect.toLowerCase()} — ${p.partNo}`,
+      evidence:`Rejection rate rose sharply on ${p.partNo}; ${p.dominantDefect} drives ${p.dominantShare.toFixed(0)}% of rejects.`,
+      action:`Priority action: ${ACTION_MAP[p.dominantDefect]||'investigate root cause'} on ${p.machine}.`,
+      impact:`~${fmtINR(p.totalCost)} in scrap cost tied to this part this period.`}));
+  const top = pareto[0];
+  if(top && top.pct>25) recs.push({priority:'High', title:`Standardize CAPA for ${top.defect}`,
+    evidence:`${top.defect} makes up ${top.pct.toFixed(0)}% of rejected units across the current selection.`,
+    action:`Roll out a standard corrective action for ${top.defect.toLowerCase()} across affected processes.`,
+    impact:`~${fmtINR(top.cost)} in associated scrap cost.`});
+  partStats.filter(p=>p.trend==='watch').slice(0,1).forEach(p=>
+    recs.push({priority:'Medium', title:`Review ${p.process} process settings for ${p.partNo}`,
+      evidence:`${p.partNo} rejection rate is drifting upward on ${p.machine}.`,
+      action:`Schedule a process audit and re-validate settings on ${p.machine}.`,
+      impact:`Prevents an estimated ~${fmtINR(p.totalCost*0.3)} in additional scrap cost if left unaddressed.`}));
+  recs.push({priority:'Medium', title:'Implement in-process inspection for top-risk parts',
+    evidence:`The top ${Math.min(3,partStats.length)} parts by risk score account for a disproportionate share of scrap cost.`,
+    action:'Add an in-process check after the highest-risk operation for these parts.',
+    impact:'Reduces downstream scrap and rework cost.'});
+  partStats.filter(p=>p.trend==='improving').slice(0,1).forEach(p=>
+    recs.push({priority:'Low', title:`Document recent improvement on ${p.partNo}`,
+      evidence:`Rejection rate on ${p.partNo} has been trending down.`,
+      action:`Capture the change made on ${p.machine} as a best practice and check if it transfers to sister machines.`,
+      impact:'Sustains cost savings and may transfer to similar parts.'}));
+  recs.push({priority:'Low', title:'Schedule preventive maintenance for top 5 machines',
+    evidence:'Machines contributing most to rejection volume have not had a recent maintenance review.',
+    action:'Schedule preventive maintenance and calibration checks for the top 5 machines by rejection volume.',
+    impact:'Reduces the likelihood of future rejection spikes.'});
+  return recs.slice(0,5);
+}
+
+/* ============================================================================
+   CHART HELPERS
+   ============================================================================ */
+if(window.Chart){
+  Chart.defaults.color = C.text;
+  Chart.defaults.font.family = "'Inter', sans-serif";
+  Chart.defaults.font.size = 11.5;
+}
+function makeChart(canvasId, config){
+  const el = document.getElementById(canvasId);
+  if(!el) return null;
+  if(chartRegistry[canvasId]){
+    try{ chartRegistry[canvasId].destroy(); }catch(e){}
+    chartRegistry[canvasId] = null;
+  }
+  if(typeof Chart === 'undefined'){
+    const wrap = el.closest('.chart-box') || el.parentElement;
+    if(wrap) wrap.innerHTML = '<div class="empty">Chart library failed to load — check your connection and refresh the page.</div>';
+    return null;
+  }
+  try{
+    chartRegistry[canvasId] = new Chart(el.getContext('2d'), config);
+  }catch(e){
+    console.error('Chart render error on #'+canvasId, e);
+    const wrap = el.closest('.chart-box') || el.parentElement;
+    if(wrap) wrap.innerHTML = '<div class="empty">This chart could not be rendered.</div>';
+  }
+  return chartRegistry[canvasId] || null;
+}
+function horizontalBarConfig(data, color){
+  return {
+    type:'bar',
+    data:{ labels:data.map(d=>d.name), datasets:[{label:'Rejection Qty', data:data.map(d=>d.rejected), backgroundColor:color, borderRadius:4, barThickness:16}] },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:(ctx)=>` ${fmtNum(ctx.parsed.x)} rejected` } } },
+      scales:{ x:{ grid:{color:C.grid}, ticks:{color:C.text} }, y:{ grid:{display:false}, ticks:{color:'#E7ECF5'} } },
+    },
+  };
+}
+function trendChartConfig(series){
+  return {
+    type:'line',
+    data:{ labels:series.map(s=>s.monthLabel), datasets:[
+      {label:'Rejection Qty', data:series.map(s=>s.rejected), borderColor:C.blue, backgroundColor:C.blue, yAxisID:'y', tension:0.35, pointRadius:2},
+      {label:'PPM', data:series.map(s=>Math.round(s.ppm)), borderColor:C.teal, backgroundColor:C.teal, yAxisID:'y1', tension:0.35, pointRadius:2},
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
+      plugins:{ legend:{position:'top', labels:{boxWidth:10, color:C.text}} },
+      scales:{ y:{position:'left', grid:{color:C.grid}}, y1:{position:'right', grid:{drawOnChartArea:false}}, x:{grid:{display:false}} } },
+  };
+}
+function paretoChartConfig(pareto){
+  return {
+    data:{ labels:pareto.map(d=>d.defect), datasets:[
+      {type:'bar', label:'Rejection Qty', data:pareto.map(d=>d.qty), backgroundColor:C.blue, yAxisID:'y', borderRadius:4},
+      {type:'line', label:'Cumulative %', data:pareto.map(d=>Number(d.cumPct.toFixed(1))), borderColor:C.teal, backgroundColor:C.teal, yAxisID:'y1', tension:0.3, pointRadius:2},
+    ]},
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'top', labels:{color:C.text}} },
+      scales:{ y:{position:'left', grid:{color:C.grid}}, y1:{position:'right', min:0, max:100, grid:{drawOnChartArea:false}}, x:{grid:{display:false}} } },
+  };
+}
+function areaChartConfig(series, key, color, label){
+  return {
+    type:'line',
+    data:{ labels:series.map(s=>s.monthLabel), datasets:[{label:label, data:series.map(s=>s[key]), borderColor:color, backgroundColor:hexAlpha(color,0.22), fill:true, tension:0.35, pointRadius:0}] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+      scales:{ y:{grid:{color:C.grid}, ticks:{callback:v=>fmtINRShort(v)}}, x:{grid:{display:false}} } },
+  };
+}
+function sparklineSvg(rates, color){
+  if(!rates || rates.length<2) return '';
+  const w=90, h=28;
+  const max=Math.max(...rates), min=Math.min(...rates), range=(max-min)||1;
+  const pts = rates.map((r,i)=> `${(i/(rates.length-1))*w},${h-((r-min)/range)*(h-4)-2}`).join(' ');
+  return `<svg width="${w}" height="${h}"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
+/* ============================================================================
+   NAV / TAB SWITCHING
+   ============================================================================ */
+function renderNav(){
+  document.getElementById('navList').innerHTML = NAV_ITEMS.map(n=>
+    `<div class="nav-item ${n.id===currentTab?'active':''}" onclick="setActiveTab('${n.id}')">${n.icon}<span>${n.label}</span></div>`).join('');
+}
+function setActiveTab(tab){
+  currentTab = tab;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+tab).classList.add('active');
+  const meta = NAV_ITEMS.find(n=>n.id===tab);
+  document.getElementById('pageTitle').textContent = meta.title;
+  document.getElementById('pageSubtitle').textContent = meta.sub;
+  renderNav();
+  renderActiveTab();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function renderActiveTab(){
+  const filtered = getFiltered();
+  if(currentTab==='overview') renderOverview(filtered);
+  else if(currentTab==='part') renderPartAnalysis(filtered);
+  else if(currentTab==='defect') renderDefectAnalysis(filtered);
+  else if(currentTab==='process') renderDimensionAnalysis('process','processAnalysisChart','processAnalysisBody',C.blue,filtered);
+  else if(currentTab==='machine') renderDimensionAnalysis('machine','machineAnalysisChart','machineAnalysisBody',C.blue,filtered);
+  else if(currentTab==='location') renderDimensionAnalysis('location','locationAnalysisChart','locationAnalysisBody',C.teal,filtered);
+  else if(currentTab==='cost') renderCostAnalysis(filtered);
+  else if(currentTab==='rootcause') renderRootCause(filtered);
+  else if(currentTab==='alerts') renderAlertsPage(filtered);
+  else if(currentTab==='reports') renderReports(filtered);
+  else if(currentTab==='chatbot') renderChatPage();
+}
+
+/* ============================================================================
+   FILTER BAR
+   ============================================================================ */
+function populateFilterOptions(){
+  const locSel=document.getElementById('fLocation'), procSel=document.getElementById('fProcess'),
+        machSel=document.getElementById('fMachine'), partSel=document.getElementById('fPart');
+
+  const machineOptions = filters.process==='All'
+    ? Array.from(new Set(RECORDS.map(r=>r.machine))).sort()
+    : Array.from(new Set(RECORDS.filter(r=>r.process===filters.process).map(r=>r.machine))).sort();
+
+  const partOptions = Array.from(new Set(RECORDS.filter(r=>
+    (filters.process==='All'||r.process===filters.process) &&
+    (filters.location==='All'||r.location===filters.location) &&
+    (filters.machine==='All'||r.machine===filters.machine)
+  ).map(r=>r.partNo))).sort();
+
+  locSel.innerHTML = ['All',...LOCATIONS].map(o=>`<option value="${o}" ${o===filters.location?'selected':''}>${o}</option>`).join('');
+  procSel.innerHTML = ['All',...PROCESSES].map(o=>`<option value="${o}" ${o===filters.process?'selected':''}>${o}</option>`).join('');
+  machSel.innerHTML = ['All',...machineOptions].map(o=>`<option value="${o}" ${o===filters.machine?'selected':''}>${o}</option>`).join('');
+  partSel.innerHTML = ['All',...partOptions].map(o=>`<option value="${o}" ${o===filters.part?'selected':''}>${o}</option>`).join('');
+  document.getElementById('fDateRange').value = filters.dateRange;
+}
+function wireFilterEvents(){
+  document.getElementById('fDateRange').addEventListener('change', e=>{ filters.dateRange=e.target.value; renderActiveTab(); });
+  document.getElementById('fLocation').addEventListener('change', e=>{ filters.location=e.target.value; filters.part='All'; populateFilterOptions(); renderActiveTab(); });
+  document.getElementById('fProcess').addEventListener('change', e=>{ filters.process=e.target.value; filters.machine='All'; filters.part='All'; populateFilterOptions(); renderActiveTab(); });
+  document.getElementById('fMachine').addEventListener('change', e=>{ filters.machine=e.target.value; filters.part='All'; populateFilterOptions(); renderActiveTab(); });
+  document.getElementById('fPart').addEventListener('change', e=>{ filters.part=e.target.value; renderActiveTab(); });
+}
+function resetFilters(){
+  filters = { dateRange:'24', location:'All', process:'All', machine:'All', part:'All' };
+  populateFilterOptions();
+  renderActiveTab();
+  toast('Filters reset.');
+}
+
+/* ============================================================================
+   OVERVIEW RENDER
+   ============================================================================ */
+function renderOverview(filtered){
+  const prevFiltered = getPrevFiltered();
+  const partStats = partStatsFrom(filtered);
+  const cur = sumAgg(filtered);
+  const prev = prevFiltered ? sumAgg(prevFiltered) : null;
+  const ppm = cur.inspected ? cur.rejected/cur.inspected*1e6 : 0;
+  const prevPpm = prev && prev.inspected ? prev.rejected/prev.inspected*1e6 : null;
+  const rate = cur.inspected ? cur.rejected/cur.inspected*100 : 0;
+  const prevRate = prev && prev.inspected ? prev.rejected/prev.inspected*100 : null;
+  const criticalParts = partStats.filter(p=>p.trend==='critical').length;
+  const series = monthlySeries(filtered);
+  const pareto = paretoData(filtered);
+
+  document.getElementById('kpiRow').innerHTML = [
+    kpiCardHtml({icon:ICONS.box, color:C.blue, label:'Total Rejections', value:fmtNum(cur.rejected), sub:'vs previous period', deltaPct:pctDelta(cur.rejected, prev?.rejected)}),
+    kpiCardHtml({icon:ICONS.gauge, color:C.teal, label:'PPM', value:fmtNum(ppm), sub:'vs previous period', deltaPct:pctDelta(ppm, prevPpm)}),
+    kpiCardHtml({icon:ICONS.currency, color:C.purple, label:'Rejection Cost', value:fmtINR(cur.cost), sub:'vs previous period', deltaPct:pctDelta(cur.cost, prev?.cost)}),
+    kpiCardHtml({icon:ICONS.currencyAlt, color:C.amber, label:'Debit Cost', value:fmtINR(cur.debitCost), sub:'vs previous period', deltaPct:pctDelta(cur.debitCost, prev?.debitCost)}),
+    kpiCardHtml({icon:ICONS.percent, color:C.pink, label:'Rejection Rate', value:rate.toFixed(2), unit:'%', sub:'vs previous period', deltaPct:pctDelta(rate, prevRate)}),
+    kpiCardHtml({icon:ICONS.shield, color:C.red, label:'Critical Parts', value:String(criticalParts), sub:'need attention', deltaPct:null}),
+  ].join('');
+
+  makeChart('trendChart', trendChartConfig(series));
+  makeChart('paretoChart', paretoChartConfig(pareto));
+  makeChart('processChart', horizontalBarConfig(breakdownBy(filtered,'process'), C.blue));
+  makeChart('machineChart', horizontalBarConfig(breakdownBy(filtered,'machine').slice(0,10), C.blue));
+  makeChart('locationChart', horizontalBarConfig(breakdownBy(filtered,'location'), C.teal));
+  makeChart('costTrendChart', areaChartConfig(series,'cost',C.purple,'Rejection Cost'));
+
+  const top5 = partStats.slice(0,5);
+  document.getElementById('topPartsBody').innerHTML = top5.map((p,i)=>`
+    <tr><td>${i+1}</td><td><span class="part-badge">${p.partNo}</span></td><td>${escapeHtml(p.partName)}</td>
+    <td>${fmtNum(p.totalRejected)}</td><td>${fmtNum(p.ppm)}</td><td>${fmtINR(p.totalCost)}</td>
+    <td>${sparklineSvg(p.rateSeries, p.trend==='improving'?C.teal:C.red)}</td></tr>`).join('') ||
+    `<tr><td colspan="7" class="empty">No parts in this selection.</td></tr>`;
+  document.getElementById('topPartsCount').textContent = `Showing top ${top5.length} of ${partStats.length} parts`;
+
+  renderAISummaryBase(filtered, partStats, pareto);
+  const recs = computeRecommendations(partStats, pareto);
+  document.getElementById('recList').innerHTML = recs.map((r,i)=> recItemHtml(r,i+1)).join('') || '<div class="empty">No priority issues detected.</div>';
+  window._lastRecs = recs;
+
+  const sigma = computeSigma(series);
+  const alerts = computeAlerts(sigma, partStats, pareto);
+  window._lastAlerts = alerts;
+  document.getElementById('alertList').innerHTML = alerts.slice(0,4).map(alertItemHtml).join('') || '<div class="empty">No active alerts.</div>';
+}
+
+function kpiCardHtml({icon,color,label,value,unit,sub,deltaPct}){
+  let deltaHtml = '<span class="kpi-delta flat">baseline</span>';
+  if(deltaPct!=null){
+    const bad = deltaPct>0.05, good = deltaPct<-0.05;
+    const cls = bad?'bad':good?'good':'flat';
+    const arrow = deltaPct>0.05?'▲':deltaPct<-0.05?'▼':'–';
+    deltaHtml = `<span class="kpi-delta ${cls}">${arrow} ${Math.abs(deltaPct).toFixed(1)}%</span>`;
+  }
+  return `<div class="kpi-card">
+    <div class="kpi-icon" style="background:${color}22;color:${color}">${icon}</div>
+    <div class="kpi-info">
+      <div class="kpi-label">${label}</div>
+      <div class="kpi-value">${value}${unit?`<span class="kpi-unit">${unit}</span>`:''}</div>
+      <div class="kpi-foot">${deltaHtml}<span class="kpi-sub">${sub}</span></div>
+    </div></div>`;
+}
+function recItemHtml(r,num){
+  const cls = r.priority==='High'?'high':r.priority==='Medium'?'medium':'low';
+  return `<div class="rec-item"><div class="rec-num">${num}</div><div class="rec-text">${escapeHtml(r.title)}</div><span class="priority-pill ${cls}">${r.priority}</span></div>`;
+}
+function alertItemHtml(a){
+  return `<div class="alert-item"><span class="sev-dot ${a.sev}"></span><span class="alert-text">${escapeHtml(a.text)}</span><span class="alert-time">${a.time}</span></div>`;
+}
+
+/* ---- AI Summary (rule-based base + optional live upgrade) ---- */
+function buildRuleBasedSummary(filtered, partStats, pareto){
+  const cur = sumAgg(filtered);
+  const ppm = cur.inspected ? cur.rejected/cur.inspected*1e6 : 0;
+  const series = monthlySeries(filtered);
+  const sigma = computeSigma(series);
+  const topPart = partStats[0], topDefect = pareto[0];
+  const trendPhrase = sigma>1 ? 'has been trending unfavorably' : sigma<-1 ? 'has improved' : 'has remained broadly stable';
+  const text = `Overall quality performance ${trendPhrase} versus its recent baseline. ${topDefect? `${topDefect.defect} contributes ${topDefect.pct.toFixed(0)}% of total rejections.`:''} ${topPart? `${topPart.machine} / ${topPart.partNo} has the highest risk score and is trending ${topPart.trend}.`:''} Current PPM stands at ${fmtNum(ppm)} with an estimated rejection cost of ${fmtINR(cur.cost)} for this period.`;
+  const bullets = [
+    topDefect ? `${topDefect.defect} contributes ${topDefect.pct.toFixed(0)}% of total rejections.` : null,
+    topPart ? `${topPart.machine} has the highest risk score at ${fmtNum(topPart.ppm)} PPM.` : null,
+    `Rejection cost this period: ${fmtINR(cur.cost)}.`,
+    partStats.filter(p=>p.trend==='critical').length ? `${partStats.filter(p=>p.trend==='critical').length} part(s) are trending critical and need attention.` : 'No parts are currently trending critical.',
+  ].filter(Boolean);
+  return {text, bullets};
+}
+function renderAISummaryBase(filtered, partStats, pareto){
+  if(aiState.summaryUsed && aiState.summaryText){
+    renderAISummaryDom(aiState.summaryText, aiState.summaryBullets, true);
+    return;
+  }
+  const {text, bullets} = buildRuleBasedSummary(filtered, partStats, pareto);
+  renderAISummaryDom(text, bullets, false);
+}
+function renderAISummaryDom(text, bullets, live){
+  document.getElementById('aiSummaryBadge').innerHTML = live ? '<span class="ai-live-badge">✨ LIVE — Generated by Claude</span>' : '';
+  document.getElementById('aiSummaryText').textContent = text;
+  const dotColors = [C.blue, C.teal, C.amber, C.purple];
+  document.getElementById('aiSummaryBullets').innerHTML = (bullets||[]).map((b,i)=>`<li><span class="dot" style="background:${dotColors[i%dotColors.length]}"></span>${escapeHtml(b)}</li>`).join('');
+}
+
+async function callClaude(messages){
+  const response = await fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:1000, messages }),
+  });
+  const data = await response.json();
+  return (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('\n');
+}
+function buildFindingsPayload(){
+  const filtered = getFiltered();
+  const partStats = partStatsFrom(filtered);
+  const pareto = paretoData(filtered);
+  const series = monthlySeries(filtered);
+  const cur = sumAgg(filtered);
+  const sigma = computeSigma(series);
+  return {
+    filters, kpis:{
+      totalInspected:cur.inspected, totalRejected:cur.rejected, ppm:Math.round(cur.inspected? cur.rejected/cur.inspected*1e6:0),
+      rejectionCost:Math.round(cur.cost), debitCost:Math.round(cur.debitCost), rejectionRatePct:Number((cur.inspected? cur.rejected/cur.inspected*100:0).toFixed(2)),
+      sigmaDeviation:Number(sigma.toFixed(2)), criticalPartsCount:partStats.filter(p=>p.trend==='critical').length,
+    },
+    monthlyRejectionRate: series.map(s=>({month:s.monthLabel, ratePct:Number(s.rate.toFixed(2))})),
+    defectPareto: pareto.slice(0,6).map(d=>({defect:d.defect, qty:d.qty, sharePct:Number(d.pct.toFixed(1))})),
+    topRiskParts: partStats.slice(0,6).map(p=>({partNo:p.partNo, process:p.process, machine:p.machine, location:p.location, ppm:Math.round(p.ppm), trend:p.trend, dominantDefect:p.dominantDefect, dominantDefectSharePct:Number(p.dominantShare.toFixed(0)), cost:Math.round(p.totalCost)})),
+  };
+}
+async function generateAIInsights(){
+  const btn = document.getElementById('aiSummaryBtn');
+  const errBox = document.getElementById('aiSummaryError');
+  errBox.textContent = '';
+  btn.disabled = true; btn.innerHTML = '<svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.6-6.4"/></svg>Analyzing…';
+  try{
+    const prompt = `You are a manufacturing quality analyst embedded in a Quality Intelligence Dashboard. You are given structured, pre-computed statistics (JSON below). Do not invent numbers not derivable from this data.
+
+Respond in exactly two parts separated by a line containing only ===JSON===.
+
+Part 1: a concise 3-4 sentence executive quality summary, plain prose, no markdown.
+
+Part 2: ONLY a valid JSON array (no markdown fences) of exactly 4 short bullet-point strings summarizing the most important findings, each under 20 words, citing real numbers from the data.
+
+DATA:
+${JSON.stringify(buildFindingsPayload())}`;
+    const text = await callClaude([{role:'user', content:prompt}]);
+    const [summaryPart, jsonPart] = text.split('===JSON===');
+    let bullets = [];
+    try{ bullets = JSON.parse((jsonPart||'').trim()); }catch(e){ bullets = null; }
+    if(!Array.isArray(bullets) || !bullets.length){
+      const {bullets:fb} = buildRuleBasedSummary(getFiltered(), partStatsFrom(getFiltered()), paretoData(getFiltered()));
+      bullets = fb;
+    }
+    aiState.summaryUsed = true;
+    aiState.summaryText = (summaryPart||'').trim();
+    aiState.summaryBullets = bullets;
+    renderAISummaryDom(aiState.summaryText, aiState.summaryBullets, true);
+    toast('AI insights updated.');
+  }catch(e){
+    errBox.textContent = "Couldn't reach the AI analysis engine — showing rule-based insights instead.";
+  }finally{
+    btn.disabled = false; btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg>Regenerate';
+  }
+}
+function openAllRecommendationsModal(){
+  const recs = window._lastRecs || [];
+  document.getElementById('infoModalTitle').textContent = 'All Recommendations';
+  document.getElementById('infoModalBody').innerHTML = recs.map((r,i)=>{
+    const cls = r.priority==='High'?'high':r.priority==='Medium'?'medium':'low';
+    return `<div class="rec-item"><div class="rec-num">${i+1}</div><div class="rec-text"><b>${escapeHtml(r.title)}</b><br><span style="color:var(--text-dim);">${escapeHtml(r.evidence)}</span><br><span style="color:var(--text);">${escapeHtml(r.action)}</span><br><span style="color:var(--teal);font-size:11.5px;">${escapeHtml(r.impact)}</span></div><span class="priority-pill ${cls}">${r.priority}</span></div>`;
+  }).join('') || '<div class="empty">No recommendations available.</div>';
+  openModal('infoModal');
+}
+
+/* ============================================================================
+   PART ANALYSIS PAGE
+   ============================================================================ */
+function setPartSort(key){
+  if(partSort.key===key) partSort.dir = partSort.dir==='desc'?'asc':'desc';
+  else { partSort.key = key; partSort.dir = 'desc'; }
+  renderPartAnalysis(getFiltered());
+}
+function renderPartAnalysis(filtered){
+  let stats = partStatsFrom(filtered);
+  const q = (document.getElementById('partSearch').value||'').toLowerCase().trim();
+  if(q) stats = stats.filter(p=> p.partNo.toLowerCase().includes(q) || p.partName.toLowerCase().includes(q));
+  stats.sort((a,b)=> partSort.dir==='desc' ? b[partSort.key]-a[partSort.key] : a[partSort.key]-b[partSort.key]);
+  document.getElementById('allPartsBody').innerHTML = stats.map((p,i)=>`
+    <tr><td>${i+1}</td><td><span class="part-badge">${p.partNo}</span></td><td>${escapeHtml(p.partName)}</td>
+    <td>${p.process}</td><td>${p.machine}</td><td>${p.location}</td>
+    <td>${fmtNum(p.totalRejected)}</td><td>${fmtNum(p.ppm)}</td><td>${fmtINR(p.totalCost)}</td>
+    <td>${sparklineSvg(p.rateSeries, p.trend==='improving'?C.teal:C.red)}</td></tr>`).join('') ||
+    `<tr><td colspan="10" class="empty">No parts match this search / filter selection.</td></tr>`;
+}
+
+/* ============================================================================
+   DEFECT ANALYSIS PAGE
+   ============================================================================ */
+function renderDefectAnalysis(filtered){
+  const pareto = paretoData(filtered);
+  makeChart('defectAnalysisChart', paretoChartConfig(pareto));
+  document.getElementById('defectAnalysisBody').innerHTML = pareto.map((d,i)=>`
+    <tr><td>${i+1}</td><td>${d.defect}</td><td>${fmtNum(d.qty)}</td><td>${d.pct.toFixed(1)}%</td><td>${d.cumPct.toFixed(1)}%</td><td>${fmtINR(d.cost)}</td></tr>`).join('') ||
+    `<tr><td colspan="6" class="empty">No defects in this selection.</td></tr>`;
+
+  const top = pareto[0];
+  if(top){
+    const map = new Map();
+    filtered.forEach(r=>{
+      const d = r.defects.find(x=>x.defect===top.defect);
+      if(!d) return;
+      if(!map.has(r.monthIdx)) map.set(r.monthIdx, {monthIdx:r.monthIdx, monthLabel:r.monthLabel, qty:0});
+      map.get(r.monthIdx).qty += d.qty;
+    });
+    const series = Array.from(map.values()).sort((a,b)=>a.monthIdx-b.monthIdx);
+    makeChart('defectTrendChart', { type:'line', data:{ labels:series.map(s=>s.monthLabel), datasets:[{label:top.defect+' Qty', data:series.map(s=>s.qty), borderColor:C.red, backgroundColor:hexAlpha(C.red,0.2), fill:true, tension:0.35, pointRadius:2}] },
+      options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:true, labels:{color:C.text}}}, scales:{y:{grid:{color:C.grid}}, x:{grid:{display:false}}}} });
+  }
+}
+
+/* ============================================================================
+   GENERIC DIMENSION ANALYSIS (Process / Machine / Location)
+   ============================================================================ */
+function renderDimensionAnalysis(dimKey, chartId, tableBodyId, color, filtered){
+  const data = breakdownBy(filtered, dimKey);
+  makeChart(chartId, horizontalBarConfig(data, color));
+  document.getElementById(tableBodyId).innerHTML = data.map((d,i)=>`
+    <tr><td>${i+1}</td><td>${d.name}</td><td>${fmtNum(d.rejected)}</td><td>${fmtNum(d.inspected)}</td><td>${fmtNum(d.ppm)}</td><td>${fmtINR(d.cost)}</td></tr>`).join('') ||
+    `<tr><td colspan="6" class="empty">No data in this selection.</td></tr>`;
+}
+
+/* ============================================================================
+   COST ANALYSIS PAGE
+   ============================================================================ */
+function renderCostAnalysis(filtered){
+  const cur = sumAgg(filtered);
+  const cats = [
+    {name:'Scrap / Material Loss', pct:0.48, color:C.red},
+    {name:'Rework & Reprocessing', pct:0.24, color:C.amber},
+    {name:'Warranty & Field Complaints', pct:0.16, color:C.blue},
+    {name:'Sorting & Containment', pct:0.12, color:C.teal},
+  ].map(c=>({...c, value:Math.round(cur.cost*c.pct)}));
+
+  makeChart('cpqChart', { type:'doughnut', data:{ labels:cats.map(c=>c.name), datasets:[{data:cats.map(c=>c.value), backgroundColor:cats.map(c=>c.color), borderWidth:0}] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'bottom', labels:{color:C.text, boxWidth:10, font:{size:10.5}}},
+      tooltip:{ callbacks:{ label:(ctx)=> ` ${ctx.label}: ${fmtINR(ctx.parsed)}` } } } } });
+
+  const series = monthlySeries(filtered);
+  makeChart('costAnalysisTrendChart', areaChartConfig(series,'cost',C.purple,'Rejection Cost'));
+
+  const byProcess = breakdownBy(filtered,'process');
+  document.getElementById('costByProcessBody').innerHTML = byProcess.map((d,i)=>`
+    <tr><td>${i+1}</td><td>${d.name}</td><td>${fmtINR(d.cost)}</td><td>${fmtINR(d.debitCost)}</td></tr>`).join('') ||
+    `<tr><td colspan="4" class="empty">No data in this selection.</td></tr>`;
+}
+
+/* ============================================================================
+   ROOT CAUSE MATRIX
+   ============================================================================ */
+function renderRootCause(filtered){
+  const processes = Array.from(new Set(filtered.map(r=>r.process))).sort();
+  if(!processes.length){ document.getElementById('rootCauseBody').innerHTML = '<div class="empty">No data in this selection.</div>'; return; }
+  const matrix = processes.map(p=> DEFECTS.map(d=> filtered.filter(r=>r.process===p).reduce((s,r)=>{
+    const found = r.defects.find(x=>x.defect===d); return s + (found?found.qty:0);
+  },0)));
+  const max = Math.max(1, ...matrix.flat());
+  let html = '<table class="heatmap"><thead><tr><th></th>' + DEFECTS.map(d=>`<th>${d}</th>`).join('') + '</tr></thead><tbody>';
+  processes.forEach((p,i)=>{
+    html += `<tr><th>${p}</th>` + DEFECTS.map((d,j)=>{
+      const v = matrix[i][j]; const alpha = 0.08 + (v/max)*0.75;
+      return `<td style="background:${hexAlpha(C.blue,alpha)}">${v||''}</td>`;
+    }).join('') + '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('rootCauseBody').innerHTML = html;
+}
+
+/* ============================================================================
+   ALERTS PAGE
+   ============================================================================ */
+function setAlertFilter(sev){
+  alertFilterState = sev;
+  document.querySelectorAll('.sev-filter button').forEach(b=> b.classList.toggle('active', b.dataset.sev===sev));
+  renderAlertsPage(getFiltered());
+}
+function renderAlertsPage(filtered){
+  const partStats = partStatsFrom(filtered);
+  const pareto = paretoData(filtered);
+  const series = monthlySeries(filtered);
+  const sigma = computeSigma(series);
+  let alerts = computeAlerts(sigma, partStats, pareto);
+  if(alertFilterState!=='all') alerts = alerts.filter(a=>a.sev===alertFilterState);
+  document.getElementById('alertsPageBody').innerHTML = alerts.map(alertItemHtml).join('') || '<div class="empty">No alerts for this selection.</div>';
+}
+
+/* ============================================================================
+   REPORTS PAGE
+   ============================================================================ */
+function renderReports(filtered){
+  const partStats = partStatsFrom(filtered);
+  const pareto = paretoData(filtered);
+  const {text} = buildRuleBasedSummary(filtered, partStats, pareto);
+  document.getElementById('reportSummary').textContent = text;
+  const cur = sumAgg(filtered);
+  document.getElementById('reportStats').innerHTML = [
+    {label:'Total Rejections', value:fmtNum(cur.rejected)},
+    {label:'PPM', value:fmtNum(cur.inspected? cur.rejected/cur.inspected*1e6:0)},
+    {label:'Rejection Cost', value:fmtINR(cur.cost)},
+    {label:'Parts Analyzed', value:fmtNum(partStats.length)},
+  ].map(s=>`<div class="report-stat"><b>${s.value}</b><span>${s.label}</span></div>`).join('');
+  window._currentFilteredForExport = filtered;
+}
+function downloadCSV(){
+  const data = window._currentFilteredForExport || getFiltered();
+  const headers = ['month','location','process','machine','part_no','part_name','unit_cost','inspected','rejected','cost','debit_cost','defect','defect_qty'];
+  const rows = [headers.join(',')];
+  data.forEach(r=> r.defects.forEach(d=>{
+    rows.push([r.monthLabel, r.location, r.process, r.machine, r.partNo, `"${r.partName}"`, r.unitCost, r.inspected, r.rejected, r.cost, r.debitCost, d.defect, d.qty].join(','));
+  }));
+  const blob = new Blob([rows.join('\n')], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'quality-data-export.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('CSV export downloaded.');
+}
+
+/* ============================================================================
+   CHATBOT
+   ============================================================================ */
+function renderChatPage(){
+  if(!chatHistory.length){
+    chatHistory.push({role:'assistant', text:"Ask me anything about rejection rates, defects, machines, locations or cost — I'll answer from the current filtered dataset."});
+  }
+  document.getElementById('chatPageMessages').innerHTML = chatHistory.map(m=>`<div class="msg ${m.role}">${escapeHtml(m.text)}</div>`).join('');
+  const box = document.getElementById('chatPageMessages'); box.scrollTop = box.scrollHeight;
+}
+function goToChatWithMessage(text){
+  setActiveTab('chatbot');
+  document.getElementById('chatPageInput').value = text;
+  sendChatMessage();
+}
+function sendFromMiniChat(){
+  const val = document.getElementById('miniChatInput').value.trim();
+  if(!val) return;
+  document.getElementById('miniChatInput').value = '';
+  goToChatWithMessage(val);
+}
+async function sendChatMessage(){
+  const input = document.getElementById('chatPageInput');
+  const text = input.value.trim();
+  if(!text) return;
+  chatHistory.push({role:'user', text});
+  input.value = '';
+  renderChatPage();
+  const btn = document.getElementById('chatPageSendBtn');
+  btn.disabled = true;
+  chatHistory.push({role:'assistant', text:'…'});
+  renderChatPage();
+  try{
+    const context = `You are the AI analyst embedded in a manufacturing Quality Intelligence Dashboard. Answer the user's question using ONLY the JSON context below, which reflects the currently filtered view. Be concise (2-5 sentences), cite concrete numbers from the data, and suggest a next action when relevant. If the question can't be answered from this data, say so plainly rather than guessing.
+
+DATA:
+${JSON.stringify(buildFindingsPayload())}`;
+    const history = chatHistory.slice(0,-1);
+    const apiMessages = [
+      {role:'user', content:context},
+      {role:'assistant', content:'Understood. Ask your question about the current quality data.'},
+      ...history.map(m=>({role:m.role, content:m.text})),
+    ];
+    const reply = await callClaude(apiMessages);
+    chatHistory[chatHistory.length-1] = {role:'assistant', text: reply || "I couldn't generate a response."};
+  }catch(e){
+    chatHistory[chatHistory.length-1] = {role:'assistant', text:"Couldn't reach the analysis engine right now — please try again in a moment."};
+  }finally{
+    btn.disabled = false;
+    renderChatPage();
+  }
+}
+
+/* ============================================================================
+   MODALS / TOAST
+   ============================================================================ */
+function openModal(id){ document.getElementById(id).classList.remove('hidden'); }
+function closeModal(id){ document.getElementById(id).classList.add('hidden'); }
+function setModalTab(tab){
+  document.querySelectorAll('#refreshModal .modal-tabs button').forEach(b=> b.classList.toggle('active', b.dataset.tab===tab));
+  document.querySelectorAll('#refreshModal .modal-pane').forEach(p=> p.classList.remove('active'));
+  document.getElementById('modalPane-'+tab).classList.add('active');
+}
+function toast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> el.classList.remove('show'), 2800);
+}
+
+/* ============================================================================
+   DATA REFRESH: SAMPLE / JSON / CSV
+   ============================================================================ */
+function refreshSidebarMeta(){
+  document.getElementById('doRange').textContent = MONTHS.length ? `${MONTHS[0].label} – ${MONTHS[MONTHS.length-1].label}` : '—';
+  document.getElementById('doRecords').textContent = fmtNum(RECORDS.length);
+  document.getElementById('doUpdated').textContent = lastUpdated.toLocaleString('en-IN', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'});
+}
+function afterDataReplaced(msg){
+  lastUpdated = new Date();
+  filters = { dateRange:'24', location:'All', process:'All', machine:'All', part:'All' };
+  aiState = { summaryUsed:false, summaryText:null, summaryBullets:null };
+  chatHistory = [];
+  partSort = { key:'totalRejected', dir:'desc' };
+  refreshSidebarMeta();
+  populateFilterOptions();
+  renderActiveTab();
+  closeModal('refreshModal');
+  toast(msg);
+}
+function regenerateSample(){
+  buildDataset(monthOffset + 1);
+  afterDataReplaced(`New month of data simulated — window now covers ${MONTHS[0].label} – ${MONTHS[MONTHS.length-1].label}.`);
+}
+/* ---- Header aliasing: accepts many real-world spellings/casings ---- */
+const HEADER_ALIASES = {
+  date:'month', months:'month', period:'month', month_label:'month', monthlabel:'month',
+  plant:'location', site:'location', factory:'location', facility:'location',
+  operation:'process', process_name:'process', processname:'process', operation_name:'process',
+  machine_no:'machine', machine_id:'machine', machineno:'machine', equipment:'machine', machine_name:'machine',
+  partno:'part_no', part_number:'part_no', partnumber:'part_no', part_id:'part_no', part:'part_no', partid:'part_no',
+  partname:'part_name', description:'part_name', part_desc:'part_name', partdesc:'part_name', name:'part_name',
+  unitcost:'unit_cost', cost_per_unit:'unit_cost', costperunit:'unit_cost', price:'unit_cost', unit_price:'unit_cost',
+  inspected_qty:'inspected', inspectedqty:'inspected', qty_inspected:'inspected', total_inspected:'inspected',
+  inspection_qty:'inspected', inspected_quantity:'inspected', qtyinspected:'inspected',
+  rejected_qty:'rejected', rejectedqty:'rejected', qty_rejected:'rejected', total_rejected:'rejected',
+  rejection_qty:'rejected', reject_qty:'rejected', rejected_quantity:'rejected', qtyrejected:'rejected', rejects:'rejected',
+  rejection_cost:'cost', scrap_cost:'cost', rejectioncost:'cost', scrapcost:'cost', total_cost:'cost',
+  debitcost:'debit_cost', debit:'debit_cost', debit_amount:'debit_cost',
+  defect_type:'defect', defect_name:'defect', defect_mode:'defect', defecttype:'defect', reason:'defect', failure_mode:'defect',
+};
+function normalizeHeaderKey(h){
+  const key = String(h||'').replace(/^\uFEFF/,'').trim().toLowerCase().replace(/[\s\-]+/g,'_').replace(/[^a-z0-9_]/g,'');
+  return HEADER_ALIASES[key] || key;
+}
+/* Clean a numeric-ish string: strips currency symbols, thousand separators, % signs, whitespace */
+function toNumber(v){
+  if(v == null || v === '') return NaN;
+  if(typeof v === 'number') return v;
+  const cleaned = String(v).replace(/[₹$,%\s]/g,'').trim();
+  if(cleaned === '') return NaN;
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? NaN : n;
+}
+const REQUIRED_FIELDS = ['location','process','machine','part_no','inspected','rejected'];
+function normalizeImportedRows(rows, availableKeys){
+  if(!Array.isArray(rows) || !rows.length) throw new Error('No records found in the data.');
+  if(availableKeys){
+    const missing = REQUIRED_FIELDS.filter(f=> !availableKeys.includes(f));
+    if(missing.length) throw new Error(`Missing required column(s): ${missing.join(', ')}. Expected headers like: month, location, process, machine, part_no, part_name, unit_cost, inspected, rejected, defect.`);
+  }
+  const monthSet = new Set();
+  let skipped = 0;
+  const parsed = rows.map(row=>{
+    const month = row.month || row.date || 'Unknown';
+    monthSet.add(month);
+    const inspected = toNumber(row.inspected);
+    const rejected = toNumber(row.rejected);
+    let unitCost = toNumber(row.unit_cost);
+    const rawCost = toNumber(row.cost);
+    if(isNaN(unitCost)) unitCost = (!isNaN(rawCost) && rejected) ? rawCost/rejected : 100;
+    const cost = !isNaN(rawCost) ? rawCost : rejected*unitCost;
+    const rawDebit = toNumber(row.debit_cost);
+    const debitCost = !isNaN(rawDebit) ? rawDebit : cost*0.4;
+    const defect = row.defect || 'Unspecified';
+    const partNo = row.part_no || 'UNKNOWN';
+    if(!row.location || !row.process || !row.machine || !row.part_no || isNaN(inspected) || isNaN(rejected)) skipped++;
+    return {
+      month, location: row.location || 'Unknown', process: row.process || 'Unknown', machine: row.machine || 'Unknown',
+      partNo, partName: row.part_name || partNo, unitCost: isNaN(unitCost)?100:unitCost,
+      inspected: isNaN(inspected)?0:inspected, rejected: isNaN(rejected)?0:rejected,
+      cost: isNaN(cost)?0:cost, debitCost: isNaN(debitCost)?0:debitCost, defect,
+    };
+  });
+  if(skipped === parsed.length) throw new Error('No row had valid location, process, machine, part number, inspected and rejected values. Check your column headers match the expected names.');
+  const monthsSorted = Array.from(monthSet).sort();
+  const monthIndexMap = new Map(monthsSorted.map((m,i)=>[m,i]));
+  const records = parsed.map(r=>({
+    monthIdx: monthIndexMap.get(r.month), monthLabel: r.month, location:r.location, process:r.process, machine:r.machine,
+    partNo:r.partNo, partName:r.partName, unitCost:r.unitCost, inspected:r.inspected, rejected:r.rejected, cost:r.cost, debitCost:r.debitCost,
+    defects:[{defect:r.defect, qty:r.rejected}],
+  }));
+  const months = monthsSorted.map((m,i)=>({idx:i, label:m}));
+  return {records, months};
+}
+function applyImportedRecords(records, months, sourceLabel){
+  RECORDS = records; MONTHS = months;
+  PARTS = Array.from(new Set(records.map(r=>r.partNo))).map(pn=>{
+    const r = records.find(x=>x.partNo===pn);
+    return {partNo:pn, partName:r.partName, process:r.process, machine:r.machine, location:r.location, unitCost:r.unitCost};
+  });
+  afterDataReplaced(`Data updated — ${RECORDS.length} records loaded${sourceLabel?(' from '+sourceLabel):''}.`);
+}
+function applyPastedJSON(){
+  const errBox = document.getElementById('jsonError');
+  errBox.textContent = '';
+  try{
+    const raw = document.getElementById('jsonInput').value.trim();
+    if(!raw) throw new Error('Paste a JSON array first.');
+    const arr = JSON.parse(raw);
+    if(!Array.isArray(arr) || !arr.length) throw new Error('Expected a non-empty JSON array of records.');
+    // Normalize keys on each object the same way CSV headers are normalized, so
+    // "Part No", "PartNo", "part_no" etc. all resolve to the same field.
+    const normalizedRows = arr.map(obj=>{
+      const out = {};
+      Object.keys(obj).forEach(k=> out[normalizeHeaderKey(k)] = obj[k]);
+      return out;
+    });
+    const availableKeys = Array.from(new Set(normalizedRows.flatMap(r=>Object.keys(r))));
+    const {records, months} = normalizeImportedRows(normalizedRows, availableKeys);
+    document.getElementById('jsonInput').value = '';
+    applyImportedRecords(records, months);
+  }catch(e){
+    errBox.textContent = 'Could not parse data: ' + e.message;
+  }
+}
+/* Quote-aware CSV line parser: handles quoted fields containing commas and escaped "" */
+function parseCSVLine(line){
+  const result = []; let cur = ''; let inQuotes = false;
+  for(let i=0;i<line.length;i++){
+    const ch = line[i];
+    if(inQuotes){
+      if(ch === '"'){
+        if(line[i+1] === '"'){ cur += '"'; i++; } else { inQuotes = false; }
+      } else { cur += ch; }
+    } else {
+      if(ch === '"') inQuotes = true;
+      else if(ch === ',') { result.push(cur); cur = ''; }
+      else cur += ch;
+    }
+  }
+  result.push(cur);
+  return result.map(s=>s.trim());
+}
+function parseCSV(text){
+  const clean = String(text).replace(/^\uFEFF/, ''); // strip BOM (common in Excel "CSV UTF-8" exports)
+  const lines = clean.split(/\r?\n/).filter(l=>l.trim().length);
+  if(!lines.length) return {rows:[], headerKeys:[]};
+  const headerKeys = parseCSVLine(lines[0]).map(normalizeHeaderKey);
+  const rows = lines.slice(1).map(line=>{
+    const cells = parseCSVLine(line);
+    const obj = {};
+    headerKeys.forEach((h,i)=> obj[h] = cells[i] !== undefined ? cells[i] : '');
+    return obj;
+  });
+  return {rows, headerKeys};
+}
+function applyCSVUpload(){
+  const errBox = document.getElementById('csvError');
+  errBox.textContent = '';
+  const fileInput = document.getElementById('csvInput');
+  const file = fileInput.files && fileInput.files[0];
+  if(!file){ errBox.textContent = 'Choose a CSV file first.'; return; }
+  const reader = new FileReader();
+  reader.onerror = ()=>{ errBox.textContent = 'Could not read the file.'; };
+  reader.onload = (e)=>{
+    try{
+      const {rows, headerKeys} = parseCSV(e.target.result);
+      if(!rows.length) throw new Error('The file has no data rows (only a header, or it is empty).');
+      const {records, months} = normalizeImportedRows(rows, headerKeys);
+      fileInput.value = '';
+      applyImportedRecords(records, months, 'CSV');
+    }catch(err){
+      errBox.textContent = 'Could not parse CSV: ' + err.message;
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* ============================================================================
+   INIT
+   ============================================================================ */
+function init(){
+  renderNav();
+  populateFilterOptions();
+  wireFilterEvents();
+  refreshSidebarMeta();
+  renderActiveTab();
+}
+init();
+</script>
+</body>
+</html>

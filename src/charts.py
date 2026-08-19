@@ -4,6 +4,7 @@ import math
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import plotly.express as px
 
 BG = "#07182c"
 CARD = "#0d2540"
@@ -173,3 +174,18 @@ def multi_top_trend(df: pd.DataFrame, category_col: str, title: str, top_per_mon
     grid = pd.MultiIndex.from_product([months, cats], names=["month_start", category_col]).to_frame(index=False)
     tracked = grid.merge(monthly[monthly[category_col].isin(cats)], how="left", on=["month_start", category_col]).fillna({"rejection quantity": 0})
     return line_chart(tracked, "month_start", "rejection quantity", category_col, title, annotate=False)
+
+
+def create_cost_pie_chart(df: pd.DataFrame) -> px.Pie:
+    """
+    Creates a pie chart from cost data.
+    
+    Args:
+        df (pd.DataFrame): DataFrame containing cost data
+    
+    Returns:
+        px.Pie: Plotly Express pie chart figure
+    """
+    # Assuming cost data is in a column named 'Cost'
+    fig = px.pie(df, values='Cost', names='Category', title='Cost Distribution')
+    return fig

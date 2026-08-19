@@ -7,6 +7,7 @@ import streamlit as st
 from src.charts import (
     control_chart, grouped_bar, horizontal_bar, line_chart, location_bar,
     multi_top_trend, pareto_chart, ppm_bar, ppm_lines, segmented_monthly_share,
+    create_cost_pie_chart
 )
 from src.data_prep import (
     aggregate_ppm, filter_data, load_data, monthly_ppm_top_part_lines,
