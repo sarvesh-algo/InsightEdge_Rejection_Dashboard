@@ -233,13 +233,6 @@ def kpi_strip(df: pd.DataFrame, baseline: pd.DataFrame | None = None):
 
 
 def render_header(df: pd.DataFrame):
-    # ---------------------------------------------------------
-    # SAFE DATE INITIALIZATION
-    # ---------------------------------------------------------
-    # Always initialize the date widget inside the real dataset
-    # boundaries. The agenda helper can produce 01-Apr-2024,
-    # while the dataset starts on 22-Apr-2024, which Streamlit
-    # rejects before the page renders.
     data_min = pd.Timestamp(df["Date"].min()).normalize()
     data_max = pd.Timestamp(df["Date"].max()).normalize()
 
@@ -250,9 +243,7 @@ def render_header(df: pd.DataFrame):
         unsafe_allow_html=True,
     )
 
-    # ---------------------------------------------------------
-    # TOP HEADER
-    # ---------------------------------------------------------
+    # Only Location and Date Range remain at the top of the page.
     left, right = st.columns([1.05, 1.25])
 
     with left:
@@ -263,7 +254,7 @@ def render_header(df: pd.DataFrame):
             "Location",
             locations,
             index=0,
-            key="top_location_v2",
+            key="top_location_v4",
         )
 
     with right:
@@ -272,7 +263,7 @@ def render_header(df: pd.DataFrame):
             value=(data_min.date(), data_max.date()),
             min_value=data_min.date(),
             max_value=data_max.date(),
-            key="top_date_range_v2",
+            key="top_date_range_v4",
         )
 
     if isinstance(selected_range, (tuple, list)) and len(selected_range) == 2:
@@ -281,66 +272,14 @@ def render_header(df: pd.DataFrame):
         start_date = selected_range
         end_date = selected_range
 
-    # ---------------------------------------------------------
-    # ADDITIONAL FILTERS
-    # ---------------------------------------------------------
-    st.markdown(
-        '<div class="section-title">Dashboard Filters</div>',
-        unsafe_allow_html=True,
-    )
-
-    c1, c2, c3, c4 = st.columns(4)
-
-    with c1:
-        processes = st.multiselect(
-            "Process",
-            sorted([x for x in df["process"].unique() if x]),
-            key="top_process_v2",
-        )
-
-    with c2:
-        machines = st.multiselect(
-            "Machine",
-            sorted([x for x in df["machine"].unique() if x]),
-            key="top_machine_v2",
-        )
-
-    with c3:
-        parts = st.multiselect(
-            "Part",
-            sorted([x for x in df["part_no_clean"].unique() if x]),
-            max_selections=20,
-            key="top_part_v2",
-        )
-
-    with c4:
-        defects = st.multiselect(
-            "Defect",
-            sorted([x for x in df["defect"].unique() if x]),
-            max_selections=20,
-            key="top_defect_v2",
-        )
-
-    # ---------------------------------------------------------
-    # APPLY FILTERS
-    # ---------------------------------------------------------
-    period_df = filter_data(
-        df,
-        start_date,
-        end_date,
-        locations=(
-            None
-            if selected_location == "All"
-            else [selected_location]
-        ),
-        processes=processes or None,
-        machines=machines or None,
-        defects=defects or None,
-        parts=parts or None,
-    )
-
+    # Filtering is intentionally handled in main(), using sidebar controls.
     return (
-        period_df,
+        filter_data(
+            df,
+            start_date,
+            end_date,
+            locations=None if selected_location == "All" else [selected_location],
+        ),
         pd.Timestamp(start_date),
         pd.Timestamp(end_date),
         selected_location,
@@ -473,9 +412,76 @@ def render_ppm_dashboard(df: pd.DataFrame):
 
     c1, c2 = st.columns(2)
     with c1:
+        # Existing newsletter-style chart: monthly PPM of top parts
+        # within the currently selected date/location/filter range.
         chart(ppm_part_lines(df, max_parts=6, title="Top Parts · Monthly PPM Trend"))
     with c2:
         chart(production_vs_ppm(df, "Production Quantity vs PPM"))
+
+    # ---------------------------------------------------------
+    # Requested part-level PPM views
+    # Kept compact: three charts across one row.
+    # The actual part selectors live in the sidebar.
+    # ---------------------------------------------------------
+    ppm_selected_parts = st.session_state.get("ppm_selected_parts", [])
+    ppm_selected_part = st.session_state.get("ppm_selected_part", "All")
+
+    p1, p2, p3 = st.columns(3)
+
+    with p1:
+        chart(
+            ppm_part_lines(
+                df,
+                max_parts=6,
+                title="Monthly PPM · Top Parts",
+            )
+        )
+
+    with p2:
+        if ppm_selected_parts:
+            selected_parts_df = df[
+                df["part_no_clean"].isin(ppm_selected_parts)
+            ]
+            chart(
+                ppm_part_lines(
+                    selected_parts_df,
+                    max_parts=max(1, len(ppm_selected_parts)),
+                    title="Monthly PPM · Selected Parts",
+                )
+            )
+        else:
+            st.markdown(
+                '<div class="dashboard-card" style="height:100%;">'
+                '<b>Monthly PPM · Selected Parts</b><br><br>'
+                '<span class="small-muted">'
+                'Select one or more parts from the PPM Part Analysis section '
+                'in the sidebar.'
+                '</span></div>',
+                unsafe_allow_html=True,
+            )
+
+    with p3:
+        if ppm_selected_part != "All":
+            single_part_df = df[
+                df["part_no_clean"] == ppm_selected_part
+            ]
+            chart(
+                ppm_part_lines(
+                    single_part_df,
+                    max_parts=1,
+                    title=f"PPM Over Time · {ppm_selected_part}",
+                )
+            )
+        else:
+            st.markdown(
+                '<div class="dashboard-card" style="height:100%;">'
+                '<b>PPM Over Time · Selected Part</b><br><br>'
+                '<span class="small-muted">'
+                'Select a part number from the PPM Part Analysis section '
+                'in the sidebar.'
+                '</span></div>',
+                unsafe_allow_html=True,
+            )
 
     # Heatmaps from the same PPM aggregation logic.
     c1, c2 = st.columns(2)
@@ -635,7 +641,8 @@ def detail_table(df: pd.DataFrame):
 def main():
     df = get_dataset()
 
-    # Sidebar: navigation only. Filters are intentionally moved into the top header.
+    # Sidebar: keep the existing navigation/design and move all secondary
+    # filters here. Nothing from the existing navigation is removed.
     with st.sidebar:
         st.markdown(
             '<div class="brand"><div class="brand-mark">◇</div><div>'
@@ -643,6 +650,7 @@ def main():
             '</div></div>', unsafe_allow_html=True
         )
         st.markdown('<div class="nav-label">Navigation</div>', unsafe_allow_html=True)
+
         pages = [
             "🏠 Overview",
             "📊 PPM Dashboard",
@@ -656,28 +664,101 @@ def main():
             "📄 Reports",
             "🤖 AI Chatbot",
         ]
-        page = st.radio("Navigation", pages, label_visibility="collapsed", key="page_selection")
+
+        page = st.radio(
+            "Navigation",
+            pages,
+            label_visibility="collapsed",
+            key="page_selection",
+        )
         page = page.split(" ", 1)[1] if " " in page else page
+
+        st.markdown("---")
+        st.markdown('<div class="nav-label">Dashboard Filters</div>', unsafe_allow_html=True)
+
+        selected_processes = st.multiselect(
+            "Process",
+            sorted([x for x in df["process"].unique() if x]),
+            key="sidebar_processes_v4",
+        )
+
+        selected_machines = st.multiselect(
+            "Machine",
+            sorted([x for x in df["machine"].unique() if x]),
+            key="sidebar_machines_v4",
+        )
+
+        selected_parts = st.multiselect(
+            "Part",
+            sorted([x for x in df["part_no_clean"].unique() if x]),
+            max_selections=20,
+            key="sidebar_parts_v4",
+        )
+
+        selected_defects = st.multiselect(
+            "Defect",
+            sorted([x for x in df["defect"].unique() if x]),
+            max_selections=20,
+            key="sidebar_defects_v4",
+        )
+
+        # PPM-specific selectors are also kept in the sidebar so the
+        # dashboard itself remains clean and compact.
+        if page == "PPM Dashboard":
+            st.markdown("---")
+            st.markdown('<div class="nav-label">PPM Part Analysis</div>', unsafe_allow_html=True)
+
+            ppm_parts = st.multiselect(
+                "Compare Parts",
+                sorted([x for x in df["part_no_clean"].unique() if x]),
+                max_selections=6,
+                key="ppm_selected_parts",
+                help="Monthly PPM for the selected parts.",
+            )
+
+            ppm_single = st.selectbox(
+                "PPM Over Time · Part",
+                ["All"] + sorted([x for x in df["part_no_clean"].unique() if x]),
+                key="ppm_selected_part",
+                help="Show PPM over time for one selected part.",
+            )
 
         st.markdown("---")
         st.markdown('<div class="nav-label">Dataset</div>', unsafe_allow_html=True)
         st.markdown(
             f'<div class="small-muted">Date coverage<br><b>{df["Date"].min():%d %b %Y} – {df["Date"].max():%d %b %Y}</b>'
             f'<br><br>Total records<br><b>{len(df):,}</b>'
-            f'<br><br>Locations<br><b>{df["location"].nunique():,}</b></div>', unsafe_allow_html=True
+            f'<br><br>Locations<br><b>{df["location"].nunique():,}</b></div>',
+            unsafe_allow_html=True,
         )
         st.markdown("---")
         st.caption("PPM target: ≤ 20,000")
 
+    # Only Location + Date Range are rendered at the top.
     period_df, start_date, end_date, selected_location = render_header(df)
 
+    # Apply sidebar filters to the already date/location-filtered data.
+    period_df = filter_data(
+        df,
+        start_date,
+        end_date,
+        locations=None if selected_location == "All" else [selected_location],
+        processes=selected_processes or None,
+        machines=selected_machines or None,
+        defects=selected_defects or None,
+        parts=selected_parts or None,
+    )
+
     if period_df.empty:
-        st.warning("No rows match the current filters. Expand the date range or clear one or more filters.")
+        st.warning(
+            "No rows match the current filters. Expand the date range or clear one or more filters."
+        )
         st.stop()
 
     baseline = previous_equal_period(df, start_date, end_date)
 
-    # Keep the original KPI strip on non-PPM pages; PPM page has its own KPI design.
+    # Keep the original KPI strip on non-PPM pages; the existing PPM dashboard
+    # has its own KPI strip and all its original visualizations.
     if page != "PPM Dashboard":
         kpi_strip(period_df, baseline)
 
@@ -706,6 +787,7 @@ def main():
 
     with st.expander("View filtered complaint records"):
         detail_table(period_df)
+
 
 
 if __name__ == "__main__":
