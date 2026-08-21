@@ -768,11 +768,11 @@ def main():
         pages = [
             "🏠 Overview",
             "📊 PPM Dashboard",
+            "📍 Location Analysis",
             "📦 Part Analysis",
             "❌ Defect Analysis",
             "⚙️ Process Analysis",
             "🏭 Machine Analysis",
-            "📍 Location Analysis",
             "💰 Cost Analysis",
             "📈 Trend Analysis",
             "📄 Reports",
