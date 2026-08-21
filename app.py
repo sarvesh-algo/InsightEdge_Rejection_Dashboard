@@ -301,15 +301,19 @@ def render_overview(df: pd.DataFrame):
     with c3:
         chart(location_bar(df, title="Rejections by Location"))
 
+    # Requested mentor change: keep the control chart on Overview.
+    monthly = aggregate_ppm(df, ["month_start"])
+    if not monthly.empty:
+        chart(control_chart(monthly, "month_start", "ppm", "PPM Control Chart · 3σ Limits"))
+
 
 def render_ppm_dashboard(df: pd.DataFrame):
-    """Complete PPM dashboard based on the newsletter PPM analysis and supplied data."""
+    """PPM dashboard with only the mentor-requested removals/changes."""
     monthly = aggregate_ppm(df, ["month_start"])
     process = aggregate_ppm(df, ["process"])
     machine = aggregate_ppm(df, ["machine"])
     location = aggregate_ppm(df, ["location"])
     part = aggregate_ppm(df, ["part_no_clean"])
-    defect = aggregate_ppm(df, ["defect"])
 
     overall = ppm_value(df)
     latest_month_ppm = 0.0
@@ -357,13 +361,22 @@ def render_ppm_dashboard(df: pd.DataFrame):
         unsafe_allow_html=True,
     )
 
-    # Hero row: trend + gauge + alerts.
-    c1, c2, c3 = st.columns([1.55, .85, .75])
+    # ---------------------------------------------------------
+    # Mentor-requested top row:
+    # Left  = PPM by Location
+    # Right = PPM Trend
+    # ---------------------------------------------------------
+    c1, c2 = st.columns(2)
     with c1:
-        chart(ppm_trend(monthly, TARGET_PPM, "PPM Trend (Overall)"))
+        chart(ppm_by_location(df, "PPM by Location"))
     with c2:
+        chart(ppm_trend(monthly, TARGET_PPM, "PPM Trend (Overall)"))
+
+    # Keep the existing gauge + alert panel; it was not requested to be removed.
+    c1, c2 = st.columns([1, 1.6])
+    with c1:
         chart(ppm_gauge(overall, TARGET_PPM))
-    with c3:
+    with c2:
         st.markdown('<div class="section-title">PPM Alerts</div>', unsafe_allow_html=True)
         high_process = process.sort_values("ppm", ascending=False).head(1)
         high_machine = machine.sort_values("ppm", ascending=False).head(1)
@@ -378,9 +391,11 @@ def render_ppm_dashboard(df: pd.DataFrame):
         if not high_part.empty and high_part.iloc[0]["ppm"] > TARGET_PPM:
             alerts.append(("🔴", f"Part {high_part.iloc[0]['part_no_clean']} has PPM {high_part.iloc[0]['ppm']:,.0f}"))
         if not alerts:
-            alerts = [("🟢", "No PPM threshold breaches in the selected period"),
-                      ("🔵", "Continue monitoring monthly movement"),
-                      ("🟢", "Target performance is currently stable")]
+            alerts = [
+                ("🟢", "No PPM threshold breaches in the selected period"),
+                ("🔵", "Continue monitoring monthly movement"),
+                ("🟢", "Target performance is currently stable"),
+            ]
         for icon, text in alerts[:5]:
             st.markdown(
                 f'<div style="padding:9px 4px;border-bottom:1px solid #173a5d;font-size:10px;">'
@@ -388,60 +403,50 @@ def render_ppm_dashboard(df: pd.DataFrame):
                 unsafe_allow_html=True,
             )
 
-    # Core comparison charts.
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        chart(ppm_rank_bar(process, "process", "PPM by Process", 10))
-    with c2:
-        chart(ppm_rank_bar(machine, "machine", "PPM by Machine · Top 10", 10))
-    with c3:
-        chart(ppm_by_location(df, "PPM by Location"))
+    # Mentor requested these two charts to be commented out.
+    # chart(ppm_rank_bar(process, "process", "PPM by Process", 10))
+    # chart(ppm_rank_bar(machine, "machine", "PPM by Machine · Top 10", 10))
 
-    c1, c2 = st.columns([1.05, 1])
-    with c1:
-        chart(ppm_bar(ppm_top_parts(df, 10), title="Top 10 Parts by PPM"))
-    with c2:
-        chart(ppm_donut(df, "Defect Contribution to Rejections"))
+    # Top 10 parts remains, but mentor requested TABLE format instead of chart.
+    st.markdown('<div class="section-title">Top 10 Parts by PPM</div>', unsafe_allow_html=True)
+    top_parts = ppm_top_parts(df, 10).copy()
+    if not top_parts.empty:
+        preferred = [c for c in ["part_no_clean", "ppm", "rejection quantity", "ppm_denominator"] if c in top_parts.columns]
+        table = top_parts[preferred].copy()
+        rename = {
+            "part_no_clean": "Part No.",
+            "ppm": "PPM",
+            "rejection quantity": "Rejection Qty",
+            "ppm_denominator": "Denominator",
+        }
+        table = table.rename(columns=rename)
+        if "PPM" in table.columns:
+            table["PPM"] = table["PPM"].round(0).astype(int)
+        st.dataframe(table, use_container_width=True, hide_index=True, height=300)
+    else:
+        st.info("No part-level PPM data available for the selected filters.")
 
-    # Trend / statistical section.
+    # Mentor requested Defect Contribution to be commented out.
+    # chart(ppm_donut(df, "Defect Contribution to Rejections"))
+
+    # Mentor requested Rolling 3M / 6M PPM to be commented out.
+    # chart(rolling_ppm_chart(monthly, TARGET_PPM, "Monthly PPM · Rolling 3M & 6M"))
+
+    # Keep the existing part-level PPM plots requested earlier.
+    # These are intentionally retained because they were not part of the removal list.
     c1, c2 = st.columns(2)
     with c1:
-        chart(rolling_ppm_chart(monthly, TARGET_PPM, "Monthly PPM · Rolling 3M & 6M"))
-    with c2:
-        chart(control_chart(monthly, "month_start", "ppm", "PPM Control Chart · 3σ Limits"))
-
-    c1, c2 = st.columns(2)
-    with c1:
-        # Existing newsletter-style chart: monthly PPM of top parts
-        # within the currently selected date/location/filter range.
         chart(ppm_part_lines(df, max_parts=6, title="Top Parts · Monthly PPM Trend"))
     with c2:
         chart(production_vs_ppm(df, "Production Quantity vs PPM"))
 
-    # ---------------------------------------------------------
-    # Requested part-level PPM views
-    # Kept compact: three charts across one row.
-    # The actual part selectors live in the sidebar.
-    # ---------------------------------------------------------
     ppm_selected_parts = st.session_state.get("ppm_selected_parts", [])
     ppm_selected_part = st.session_state.get("ppm_selected_part", "All")
 
-    p1, p2, p3 = st.columns(3)
-
+    p1, p2 = st.columns(2)
     with p1:
-        chart(
-            ppm_part_lines(
-                df,
-                max_parts=6,
-                title="Monthly PPM · Top Parts",
-            )
-        )
-
-    with p2:
         if ppm_selected_parts:
-            selected_parts_df = df[
-                df["part_no_clean"].isin(ppm_selected_parts)
-            ]
+            selected_parts_df = df[df["part_no_clean"].isin(ppm_selected_parts)]
             chart(
                 ppm_part_lines(
                     selected_parts_df,
@@ -450,21 +455,11 @@ def render_ppm_dashboard(df: pd.DataFrame):
                 )
             )
         else:
-            st.markdown(
-                '<div class="dashboard-card" style="height:100%;">'
-                '<b>Monthly PPM · Selected Parts</b><br><br>'
-                '<span class="small-muted">'
-                'Select one or more parts from the PPM Part Analysis section '
-                'in the sidebar.'
-                '</span></div>',
-                unsafe_allow_html=True,
-            )
+            chart(ppm_part_lines(df, max_parts=6, title="Monthly PPM · Top Parts"))
 
-    with p3:
+    with p2:
         if ppm_selected_part != "All":
-            single_part_df = df[
-                df["part_no_clean"] == ppm_selected_part
-            ]
+            single_part_df = df[df["part_no_clean"] == ppm_selected_part]
             chart(
                 ppm_part_lines(
                     single_part_df,
@@ -476,84 +471,203 @@ def render_ppm_dashboard(df: pd.DataFrame):
             st.markdown(
                 '<div class="dashboard-card" style="height:100%;">'
                 '<b>PPM Over Time · Selected Part</b><br><br>'
-                '<span class="small-muted">'
-                'Select a part number from the PPM Part Analysis section '
-                'in the sidebar.'
-                '</span></div>',
+                '<span class="small-muted">Select a part number from the PPM Part Analysis section in the sidebar.</span>'
+                '</div>',
                 unsafe_allow_html=True,
             )
 
-    # Heatmaps from the same PPM aggregation logic.
-    c1, c2 = st.columns(2)
-    with c1:
-        chart(ppm_heatmap(df, "process", "PPM Heatmap · Process vs Month", top_n=10))
-    with c2:
-        chart(ppm_heatmap(df, "machine", "PPM Heatmap · Machine vs Month", top_n=10))
+    # ---------------------------------------------------------
+    # Mentor request: remove heatmaps and everything that was
+    # below the heatmap section. Therefore the PPM dashboard ends
+    # here; no heatmaps/distribution/pareto/AI summary are rendered.
+    # ---------------------------------------------------------
 
-    c1, c2 = st.columns(2)
-    with c1:
-        chart(ppm_heatmap(df, "location", "PPM Heatmap · Location vs Month", top_n=10))
-    with c2:
-        chart(ppm_heatmap(df, "defect", "PPM Heatmap · Defect vs Month", top_n=10))
 
-    c1, c2 = st.columns(2)
-    with c1:
-        chart(ppm_distribution_chart(df, TARGET_PPM, "PPM Distribution"))
-    with c2:
-        chart(pareto_chart(df, "part_no_clean", "rejection quantity", 15, "Part Rejection Pareto · PPM Context"))
+def _unique_join(series: pd.Series) -> str:
+    values = []
+    for value in series.dropna().astype(str):
+        value = value.strip()
+        if value and value.lower() not in {"nan", "none"} and value not in values:
+            values.append(value)
+    return ", ".join(values)
 
-    # Newsletter-style top-part table: highest PPM part per month and track it.
-    st.markdown('<div class="section-title">Monthly Highest-PPM Parts</div>', unsafe_allow_html=True)
-    trend_parts = monthly_ppm_top_part_lines(df, max_parts=10)
-    if not trend_parts.empty:
-        pivot = trend_parts.pivot_table(index="part_no_clean", columns="month_start", values="ppm", fill_value=0)
-        pivot.columns = [pd.Timestamp(c).strftime("%b %y") for c in pivot.columns]
-        pivot = pivot.round(0).reset_index()
-        st.dataframe(pivot, use_container_width=True, hide_index=True, height=260)
 
-    # AI-style summary and actions.
-    st.markdown('<div class="section-title">AI Quality Summary & Recommended Actions</div>', unsafe_allow_html=True)
-    left, right = st.columns(2)
-    with left:
-        process_name = str(high_process.iloc[0]["process"]) if not high_process.empty else "N/A"
-        process_ppm = float(high_process.iloc[0]["ppm"]) if not high_process.empty else 0
-        machine_name = str(high_machine.iloc[0]["machine"]) if not high_machine.empty else "N/A"
-        machine_ppm = float(high_machine.iloc[0]["ppm"]) if not high_machine.empty else 0
-        part_name = str(high_part.iloc[0]["part_no_clean"]) if not high_part.empty else "N/A"
-        part_ppm = float(high_part.iloc[0]["ppm"]) if not high_part.empty else 0
-        st.markdown(
-            f'<div class="insight-card">'
-            f'<b>Overall PPM:</b> {overall:,.0f} · '
-            f'<span class="{target_class}">{target_status}</span><br><br>'
-            f'🔴 Highest process: <b>{process_name}</b> ({process_ppm:,.0f} PPM)<br>'
-            f'🟠 Highest machine: <b>{machine_name}</b> ({machine_ppm:,.0f} PPM)<br>'
-            f'🟡 Highest-PM part: <b>{part_name}</b> ({part_ppm:,.0f} PPM)<br>'
-            f'📈 Monthly average: <b>{ytd_avg:,.0f} PPM</b>'
-            f'</div>', unsafe_allow_html=True,
-        )
-    with right:
-        actions = []
-        if process_name != "N/A": actions.append(f"Investigate high PPM in {process_name} process")
-        if machine_name != "N/A": actions.append(f"Inspect {machine_name} for tooling / parameter issues")
-        if part_name != "N/A": actions.append(f"Perform root-cause review for part {part_name}")
-        actions.append("Review top defects contributing to rejected quantity")
-        actions.append("Monitor rolling 3M and 6M PPM against target")
-        html = '<div class="dashboard-card"><b>Recommended Actions</b><br><br>'
-        for i, action in enumerate(actions[:5]):
-            priority = "High" if i < 3 else "Medium"
-            html += f'<div style="padding:7px 0;border-bottom:1px solid #173a5d;font-size:10px;">✓ {action} <span style="float:right;color:{"#ff6478" if priority == "High" else "#f6c453"};font-weight:700">{priority}</span></div>'
-        html += '</div>'
-        st.markdown(html, unsafe_allow_html=True)
+def _customer_complaint_part_tables(df: pd.DataFrame):
+    """Build the two newsletter-style Top-50 part tables.
+
+    The requested newsletter period is fixed to August 2024 through June 2025.
+    Occurrences mean rejection-entry rows for each part; rejection quantity and
+    cost are summed.
+    """
+    start = pd.Timestamp("2024-08-01")
+    end = pd.Timestamp("2025-06-30 23:59:59")
+    work = df.copy()
+    work["Date"] = pd.to_datetime(work["Date"], errors="coerce")
+    work = work[(work["Date"] >= start) & (work["Date"] <= end)].copy()
+
+    if work.empty or "part_no_clean" not in work.columns:
+        return pd.DataFrame(), pd.DataFrame()
+
+    work["_month"] = work["Date"].dt.to_period("M")
+    months = pd.period_range("2024-08", "2025-06", freq="M")
+    month_labels = ["Aug", "Sept", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr", "May", "June"]
+
+    # Normalize numeric columns without changing the source dataframe.
+    for col in ["rejection quantity", "total_cost"]:
+        if col in work.columns:
+            work[col] = pd.to_numeric(work[col], errors="coerce").fillna(0)
+        else:
+            work[col] = 0.0
+
+    # A rejection occurrence means an actual rejection entry, i.e. a row
+    # with positive rejection quantity. Other quality/activity rows are not
+    # counted as rejection occurrences.
+    work = work[work["rejection quantity"] > 0].copy()
+
+    if work.empty:
+        return pd.DataFrame(), pd.DataFrame()
+
+    group_cols = "part_no_clean"
+    grouped = work.groupby(group_cols, dropna=False)
+
+    base = grouped.agg(
+        **{
+            "Total rejection occurrences": ("part_no_clean", "size"),
+            "Total rejection quantity": ("rejection quantity", "sum"),
+            "Total rejection cost": ("total_cost", "sum"),
+        }
+    ).reset_index()
+
+    # Monthly occurrence counts.
+    # Monthly occurrence counts. Use groupby/unstack rather than pivot_table
+    # because the part number is both the index and the occurrence value.
+    occ = (
+        work.groupby([group_cols, "_month"], dropna=False)
+        .size()
+        .unstack("_month", fill_value=0)
+        .reindex(columns=months, fill_value=0)
+        .reset_index()
+    )
+    occ.columns = [group_cols] + month_labels
+
+    # Monthly rejection quantities.
+    qty = (
+        work.groupby([group_cols, "_month"], dropna=False)["rejection quantity"]
+        .sum()
+        .unstack("_month", fill_value=0)
+        .reindex(columns=months, fill_value=0)
+        .reset_index()
+    )
+    qty.columns = [group_cols] + month_labels
+
+    # Unique descriptors for the whole requested period.
+    descriptor = grouped.agg(
+        **{
+            "Defects": ("defect", _unique_join) if "defect" in work.columns else ("part_no_clean", lambda s: ""),
+            "Processes": ("process", _unique_join) if "process" in work.columns else ("part_no_clean", lambda s: ""),
+            "Location(s)": ("location", _unique_join) if "location" in work.columns else ("part_no_clean", lambda s: ""),
+        }
+    ).reset_index()
+
+    common = base.merge(descriptor, on=group_cols, how="left")
+
+    # Table 1: rank by rejection-entry occurrences.
+    table_occ = occ.merge(common, on=group_cols, how="left")
+    table_occ = table_occ[
+        [group_cols] + month_labels + [
+            "Total rejection occurrences",
+            "Total rejection quantity",
+            "Total rejection cost",
+            "Defects",
+            "Processes",
+            "Location(s)",
+        ]
+    ]
+    table_occ = table_occ.sort_values(
+        ["Total rejection occurrences", "Total rejection quantity"],
+        ascending=[False, False],
+    ).head(50).reset_index(drop=True)
+
+    # Table 2: rank by rejection quantity.
+    table_qty = qty.merge(common, on=group_cols, how="left")
+    table_qty = table_qty[
+        [group_cols] + month_labels + [
+            "Total rejection quantity",
+            "Total rejection occurrences",
+            "Total rejection cost",
+            "Defects",
+            "Processes",
+            "Location(s)",
+        ]
+    ]
+    table_qty = table_qty.sort_values(
+        ["Total rejection quantity", "Total rejection occurrences"],
+        ascending=[False, False],
+    ).head(50).reset_index(drop=True)
+
+    # Presentation-friendly names / number formats.
+    table_occ = table_occ.rename(columns={"part_no_clean": "Part No."})
+    table_qty = table_qty.rename(columns={"part_no_clean": "Part No."})
+    for table in [table_occ, table_qty]:
+        for col in month_labels:
+            table[col] = pd.to_numeric(table[col], errors="coerce").fillna(0).round(0).astype(int)
+        for col in ["Total rejection occurrences", "Total rejection quantity"]:
+            if col in table.columns:
+                table[col] = pd.to_numeric(table[col], errors="coerce").fillna(0).round(0).astype(int)
+        if "Total rejection cost" in table.columns:
+            table["Total rejection cost"] = pd.to_numeric(table["Total rejection cost"], errors="coerce").fillna(0).round(2)
+
+    return table_occ, table_qty
 
 
 def render_part_analysis(df: pd.DataFrame):
     st.subheader("Part Analysis")
+
+    # Keep the original Part Analysis plots. The requested tables are added
+    # below them instead of replacing/removing the visual analysis.
     c1, c2 = st.columns(2)
     with c1:
-        chart(horizontal_bar(top_n(df, "part_name_clean", n=10).rename(columns={"part_name_clean":"Part"}), "Part", title="Top 10 Defective Parts"))
+        chart(horizontal_bar(
+            top_n(df, "part_name_clean", n=10).rename(columns={"part_name_clean":"Part"}),
+            "Part",
+            title="Top 10 Defective Parts",
+        ))
     with c2:
         chart(ppm_bar(ppm_top_parts(df, 10), title="Top 10 Parts by PPM"))
     chart(multi_top_trend(df, "part_name_clean", "Top Defective Parts · 6M Trend", max_series=5))
+
+    st.markdown('<div class="section-title">Customer Complaints · Top 50 Parts</div>', unsafe_allow_html=True)
+    st.caption("Fixed newsletter period: August 2024 to June 2025 · All locations")
+
+    occurrence_table, quantity_table = _customer_complaint_part_tables(df)
+
+    st.markdown(
+        '<div class="section-title">1. Top 50 Parts with Highest Rejection Occurrences</div>',
+        unsafe_allow_html=True,
+    )
+    if occurrence_table.empty:
+        st.info("No complaint records found for August 2024 to June 2025.")
+    else:
+        st.dataframe(
+            occurrence_table,
+            use_container_width=True,
+            hide_index=True,
+            height=520,
+        )
+
+    st.markdown(
+        '<div class="section-title">2. Top 50 Parts with Highest Rejection Quantities</div>',
+        unsafe_allow_html=True,
+    )
+    if quantity_table.empty:
+        st.info("No complaint records found for August 2024 to June 2025.")
+    else:
+        st.dataframe(
+            quantity_table,
+            use_container_width=True,
+            hide_index=True,
+            height=520,
+        )
 
 
 def render_defect_analysis(df: pd.DataFrame):
